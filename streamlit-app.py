@@ -8,27 +8,22 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import requests
+import requests
+from io import BytesIO
 
-# ---------------------------------------------
-# CONFIGURATION
-# ---------------------------------------------
-st.set_page_config(
-    page_title="Optimization Sensitivity Dashboard",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-st.title("🏭 CO₂ Sensitivity & Factory Opening Dashboard")
-
-# ---------------------------------------------
-# LOAD DATA DIRECTLY FROM GITHUB
-# ---------------------------------------------
-GITHUB_CSV_URL = "https://raw.githubusercontent.com/aydınarda/simulation-data/main/simulation_results_full.csv"
+# Load Excel directly from GitHub
+GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/simulation-data/main/simulation_results_full.xlsx"
 
 st.info("📡 Loading live simulation data from GitHub...")
 
 try:
-    df = pd.read_csv(GITHUB_CSV_URL, encoding="cp1254")
+    # Download the Excel file from GitHub
+    response = requests.get(GITHUB_XLSX_URL)
+    response.raise_for_status()
+
+    # Read into DataFrame
+    df = pd.read_excel(BytesIO(response.content), sheet_name="Summary")
+
     st.success("✅ Data successfully loaded from GitHub!")
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
