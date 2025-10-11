@@ -12,7 +12,7 @@ import requests
 from io import BytesIO
 
 # Load Excel directly from GitHub
-GITHUB_XLSX_URL = "simulation_results_full.xlsx"
+GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/simulation_results_full.xlsx"
 
 st.info("📡 Loading live simulation data from GitHub...")
 
@@ -28,7 +28,7 @@ try:
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
     st.stop()
-
+    
 # ---------------------------------------------
 # SIDEBAR FILTERS
 # ---------------------------------------------
