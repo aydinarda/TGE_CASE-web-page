@@ -28,7 +28,7 @@ GITHUB_CSV_URL = "https://raw.githubusercontent.com/aydınarda/simulation-data/m
 st.info("📡 Loading live simulation data from GitHub...")
 
 try:
-    df = pd.read_csv(GITHUB_CSV_URL)
+    df = df = pd.read_csv(GITHUB_CSV_URL, encoding="utf-8")
     st.success("✅ Data successfully loaded from GitHub!")
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
