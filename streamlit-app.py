@@ -12,7 +12,7 @@ import requests
 from io import BytesIO
 
 # Load Excel directly from GitHub
-GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/simulation-data/main/simulation_results_full.xlsx"
+GITHUB_XLSX_URL = "simulation_results_full.xlsx"
 
 st.info("📡 Loading live simulation data from GitHub...")
 
