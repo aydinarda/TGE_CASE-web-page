@@ -122,29 +122,53 @@ col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','
 # ----------------------------------------------------
 st.markdown("## 📈 Cost vs CO₂ Emission Sensitivity")
 
+# Let user choose which cost metric to plot
+cost_metric_map = {
+    "Objective Value (€)": "Objective_value",
+    "Inventory Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3"],
+    "Transport Cost (€)": ["Transport_L1", "Transport_L2", "Transport_L3"],
+    "Total Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3", "Transport_L1", "Transport_L2", "Transport_L3"]
+}
+
+selected_metric_label = st.selectbox(
+    "Select Cost Metric to Plot:",
+    list(cost_metric_map.keys()),
+    index=0,
+    help="Choose which cost metric to show on the Y-axis."
+)
+
+# Compute total columns if needed
 filtered = pool.copy()
+if isinstance(cost_metric_map[selected_metric_label], list):
+    filtered["Selected_Cost"] = filtered[cost_metric_map[selected_metric_label]].sum(axis=1)
+    y_label = selected_metric_label
+else:
+    filtered["Selected_Cost"] = filtered[cost_metric_map[selected_metric_label]]
+    y_label = selected_metric_label
 
 if not filtered.empty:
     fig_sens = px.scatter(
         filtered,
         x="CO2_Total",
-        y="Objective_value",
+        y="Selected_Cost",
         color="CO2_percentage",
         size="Unit_penaltycost",
         hover_data=["CO2_CostAtMfg", "Product_weight", "Unit_penaltycost", "CO2_percentage"],
-        title=f"Objective Cost vs Total CO₂ (Weight={weight_selected} kg, Penalty={penalty_cost}, MfgCO₂={co2_cost})",
-        labels={
-            "CO2_Total": "Total CO₂ Emissions (tons)",
-            "Objective_value": "Objective Cost (€)"
-        },
+        title=f"{selected_metric_label} vs Total CO₂ (Weight={weight_selected} kg, Penalty={penalty_cost}, MfgCO₂={co2_cost})",
+        labels={"CO2_Total": "Total CO₂ Emissions (tons)", "Selected_Cost": y_label},
         color_continuous_scale="Viridis",
         template="plotly_white"
     )
 
-    # Highlight the currently selected scenario
+    # Highlight current scenario
+    if isinstance(cost_metric_map[selected_metric_label], list):
+        closest_y = closest[cost_metric_map[selected_metric_label]].sum()
+    else:
+        closest_y = closest[cost_metric_map[selected_metric_label]]
+
     fig_sens.add_scatter(
         x=[closest["CO2_Total"]],
-        y=[closest["Objective_value"]],
+        y=[closest_y],
         mode="markers+text",
         marker=dict(size=16, color="red"),
         text=["Current Selection"],
@@ -155,7 +179,7 @@ if not filtered.empty:
     st.plotly_chart(fig_sens, use_container_width=True)
 else:
     st.warning("No scenarios found for this exact combination to show sensitivity.")
-
+    
 # ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
 # ----------------------------------------------------
