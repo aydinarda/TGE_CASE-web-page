@@ -127,7 +127,6 @@ cost_metric_map = {
     "Objective Value (€)": "Objective_value",
     "Inventory Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3"],
     "Transport Cost (€)": ["Transport_L1", "Transport_L2", "Transport_L3"],
-    "Total Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3", "Transport_L1", "Transport_L2", "Transport_L3"]
 }
 
 selected_metric_label = st.selectbox(
