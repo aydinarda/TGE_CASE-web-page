@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Streamlit Dashboard – Sensitivity and Factory Insights
-Author: Arda Aydın 
+Author: Arda Aydın (optimized with caching + penalty cost slider)
 """
 
 import streamlit as st
@@ -59,12 +59,38 @@ except Exception as e:
 # ----------------------------------------------------
 st.sidebar.header("🎛️ Filter Parameters")
 
-weight_selected = st.sidebar.selectbox("Select Product Weight (kg)", sorted(df["Product_weight"].unique()))
-co2_pct = st.sidebar.slider("CO₂ Percentage", float(df["CO2_percentage"].min()), float(df["CO2_percentage"].max()),
-                            float(df["CO2_percentage"].mean()), step=0.01)
-co2_cost = st.sidebar.slider("CO₂ Manufacturing Cost (€ per ton)",
-                             float(df["CO2_CostAtMfg"].min()), float(df["CO2_CostAtMfg"].max()),
-                             float(df["CO2_CostAtMfg"].mean()), step=0.5)
+weight_selected = st.sidebar.selectbox(
+    "Select Product Weight (kg)",
+    sorted(df["Product_weight"].unique())
+)
+
+co2_pct = st.sidebar.slider(
+    "CO₂ Percentage",
+    float(df["CO2_percentage"].min()),
+    float(df["CO2_percentage"].max()),
+    float(df["CO2_percentage"].mean()),
+    step=0.01
+)
+
+co2_cost = st.sidebar.slider(
+    "CO₂ Manufacturing Cost (€ per ton)",
+    float(df["CO2_CostAtMfg"].min()),
+    float(df["CO2_CostAtMfg"].max()),
+    float(df["CO2_CostAtMfg"].mean()),
+    step=0.5
+)
+
+# ✅ NEW SLIDER FOR PENALTY COST
+if "Unit_penaltycost" in df.columns:
+    penalty_cost = st.sidebar.slider(
+        "Penalty Cost (€/unit)",
+        float(df["Unit_penaltycost"].min()),
+        float(df["Unit_penaltycost"].max()),
+        float(df["Unit_penaltycost"].mean()),
+        step=0.1
+    )
+else:
+    penalty_cost = None
 
 # ✅ Use preprocessed group to avoid repeated filtering
 subset = data_by_weight[weight_selected]
@@ -73,7 +99,21 @@ subset = data_by_weight[weight_selected]
 # KPI VIEW – Closest Scenario
 # ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
-closest = subset.iloc[(subset["CO2_percentage"] - co2_pct).abs().argmin()]
+
+# Match closest scenario using all three dimensions
+if penalty_cost is not None:
+    subset["penalty_diff"] = (subset["Unit_penaltycost"] - penalty_cost).abs()
+else:
+    subset["penalty_diff"] = 0
+
+closest_idx = (
+    (subset["CO2_percentage"] - co2_pct).abs()
+    + (subset["CO2_CostAtMfg"] - co2_cost).abs()
+    + subset["penalty_diff"]
+).idxmin()
+
+closest = subset.loc[closest_idx]
+
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
@@ -103,4 +143,4 @@ if "f2_2" in df.columns:
 # RAW DATA VIEW
 # ----------------------------------------------------
 with st.expander("📄 Show Full Summary Data"):
-    st.dataframe(df.head(1000), use_container_width=True)
+    st.dataframe(df.head(500), use_container_width=True)
