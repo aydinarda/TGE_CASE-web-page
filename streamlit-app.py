@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Streamlit Dashboard – Sensitivity and Factory Insights
-Author: Arda Aydın (optimized with caching + penalty cost slider)
+Author: Arda Aydın (optimized with caching + discrete sliders)
 """
 
 import streamlit as st
@@ -72,48 +72,43 @@ co2_pct = st.sidebar.slider(
     step=0.01
 )
 
-co2_cost = st.sidebar.slider(
+# ✅ Use only discrete existing options for CO₂ cost and penalty cost
+co2_cost_options = sorted(df["CO2_CostAtMfg"].unique().tolist())
+penalty_options = sorted(df["Unit_penaltycost"].unique().tolist())
+
+co2_cost = st.sidebar.select_slider(
     "CO₂ Manufacturing Cost (€ per ton)",
-    float(df["CO2_CostAtMfg"].min()),
-    float(df["CO2_CostAtMfg"].max()),
-    float(df["CO2_CostAtMfg"].mean()),
-    step=0.5
+    options=co2_cost_options,
+    value=co2_cost_options[len(co2_cost_options)//2]
 )
 
-# ✅ NEW SLIDER FOR PENALTY COST
-if "Unit_penaltycost" in df.columns:
-    penalty_cost = st.sidebar.slider(
-        "Penalty Cost (€/unit)",
-        float(df["Unit_penaltycost"].min()),
-        float(df["Unit_penaltycost"].max()),
-        float(df["Unit_penaltycost"].mean()),
-        step=0.1
-    )
-else:
-    penalty_cost = None
+penalty_cost = st.sidebar.select_slider(
+    "Penalty Cost (€/unit)",
+    options=penalty_options,
+    value=penalty_options[len(penalty_options)//2]
+)
 
-# ✅ Use preprocessed group to avoid repeated filtering
+# ----------------------------------------------------
+# FILTER SUBSET AND FIND CLOSEST SCENARIO
+# ----------------------------------------------------
 subset = data_by_weight[weight_selected]
 
+# Exact match on CO₂ manufacturing cost and penalty cost
+pool = subset[
+    (subset["CO2_CostAtMfg"] == co2_cost) &
+    (subset["Unit_penaltycost"] == penalty_cost)
+]
+
+if pool.empty:
+    st.warning("⚠️ No exact matches found for this combination — showing nearest instead.")
+    pool = subset.copy()
+
+closest = pool.iloc[(pool["CO2_percentage"] - co2_pct).abs().argmin()]
+
 # ----------------------------------------------------
-# KPI VIEW – Closest Scenario
+# KPI VIEW
 # ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
-
-# Match closest scenario using all three dimensions
-if penalty_cost is not None:
-    subset["penalty_diff"] = (subset["Unit_penaltycost"] - penalty_cost).abs()
-else:
-    subset["penalty_diff"] = 0
-
-closest_idx = (
-    (subset["CO2_percentage"] - co2_pct).abs()
-    + (subset["CO2_CostAtMfg"] - co2_cost).abs()
-    + subset["penalty_diff"]
-).idxmin()
-
-closest = subset.loc[closest_idx]
-
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
@@ -127,21 +122,7 @@ col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','
 # ----------------------------------------------------
 st.markdown("## 📈 Cost vs CO₂ Emission Sensitivity")
 
-# Filter for current penalty and manufacturing cost neighborhood (for stability)
-filtered = subset.copy()
-if penalty_cost is not None:
-    # Keep penalty cost dimension narrow around selected value
-    tol_penalty = 0.2
-    filtered = filtered[
-        (filtered["Unit_penaltycost"] >= penalty_cost - tol_penalty)
-        & (filtered["Unit_penaltycost"] <= penalty_cost + tol_penalty)
-    ]
-
-tol_cost = 1.0
-filtered = filtered[
-    (filtered["CO2_CostAtMfg"] >= co2_cost - tol_cost)
-    & (filtered["CO2_CostAtMfg"] <= co2_cost + tol_cost)
-]
+filtered = pool.copy()
 
 if not filtered.empty:
     fig_sens = px.scatter(
@@ -150,8 +131,8 @@ if not filtered.empty:
         y="Objective_value",
         color="CO2_percentage",
         size="Unit_penaltycost",
-        hover_data=["CO2_CostAtMfg", "Product_weight", "Unit_penaltycost"],
-        title=f"Objective Cost vs Total CO₂ (Weight={weight_selected} kg)",
+        hover_data=["CO2_CostAtMfg", "Product_weight", "Unit_penaltycost", "CO2_percentage"],
+        title=f"Objective Cost vs Total CO₂ (Weight={weight_selected} kg, Penalty={penalty_cost}, MfgCO₂={co2_cost})",
         labels={
             "CO2_Total": "Total CO₂ Emissions (tons)",
             "Objective_value": "Objective Cost (€)"
@@ -173,8 +154,7 @@ if not filtered.empty:
 
     st.plotly_chart(fig_sens, use_container_width=True)
 else:
-    st.warning("No nearby scenarios found for this combination to show sensitivity.")
-
+    st.warning("No scenarios found for this exact combination to show sensitivity.")
 
 # ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
