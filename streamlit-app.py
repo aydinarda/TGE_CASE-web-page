@@ -123,6 +123,60 @@ col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','
 col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}")
 
 # ----------------------------------------------------
+# COST vs EMISSION SENSITIVITY PLOT
+# ----------------------------------------------------
+st.markdown("## 📈 Cost vs CO₂ Emission Sensitivity")
+
+# Filter for current penalty and manufacturing cost neighborhood (for stability)
+filtered = subset.copy()
+if penalty_cost is not None:
+    # Keep penalty cost dimension narrow around selected value
+    tol_penalty = 0.2
+    filtered = filtered[
+        (filtered["Unit_penaltycost"] >= penalty_cost - tol_penalty)
+        & (filtered["Unit_penaltycost"] <= penalty_cost + tol_penalty)
+    ]
+
+tol_cost = 1.0
+filtered = filtered[
+    (filtered["CO2_CostAtMfg"] >= co2_cost - tol_cost)
+    & (filtered["CO2_CostAtMfg"] <= co2_cost + tol_cost)
+]
+
+if not filtered.empty:
+    fig_sens = px.scatter(
+        filtered,
+        x="CO2_Total",
+        y="Objective_value",
+        color="CO2_percentage",
+        size="Unit_penaltycost",
+        hover_data=["CO2_CostAtMfg", "Product_weight", "Unit_penaltycost"],
+        title=f"Objective Cost vs Total CO₂ (Weight={weight_selected} kg)",
+        labels={
+            "CO2_Total": "Total CO₂ Emissions (tons)",
+            "Objective_value": "Objective Cost (€)"
+        },
+        color_continuous_scale="Viridis",
+        template="plotly_white"
+    )
+
+    # Highlight the currently selected scenario
+    fig_sens.add_scatter(
+        x=[closest["CO2_Total"]],
+        y=[closest["Objective_value"]],
+        mode="markers+text",
+        marker=dict(size=16, color="red"),
+        text=["Current Selection"],
+        textposition="top center",
+        name="Selected Scenario"
+    )
+
+    st.plotly_chart(fig_sens, use_container_width=True)
+else:
+    st.warning("No nearby scenarios found for this combination to show sensitivity.")
+
+
+# ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
 # ----------------------------------------------------
 if "f2_2" in df.columns:
