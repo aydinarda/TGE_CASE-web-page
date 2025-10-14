@@ -1,37 +1,62 @@
 # -*- coding: utf-8 -*-
 """
 Streamlit Dashboard – Sensitivity and Factory Insights
-Author: Arda Aydın
+Author: Arda Aydın 
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import requests
-import requests
 from io import BytesIO
 
-# Load Excel directly from GitHub
+# ----------------------------------------------------
+# CONFIGURATION
+# ----------------------------------------------------
+st.set_page_config(
+    page_title="Optimization Sensitivity Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+st.title("🏭 CO₂ Sensitivity & Factory Opening Dashboard")
+
+# ----------------------------------------------------
+# CACHED DATA LOADERS
+# ----------------------------------------------------
+@st.cache_data(show_spinner="📡 Fetching live data from GitHub...")
+def load_data_from_github(url: str):
+    """Download and read the Excel file from GitHub (cached)."""
+    response = requests.get(url)
+    response.raise_for_status()
+    return pd.read_excel(BytesIO(response.content), sheet_name="Summary")
+
+@st.cache_data
+def preprocess(df: pd.DataFrame):
+    """Pre-group the dataframe by Product_weight for instant filtering."""
+    return {w: d for w, d in df.groupby("Product_weight")}
+
+@st.cache_data
+def compute_pivot(df: pd.DataFrame):
+    """Compute factory openings pivot once for heatmap."""
+    return df.groupby(["CO2_percentage", "Product_weight"])["f2_2"].mean().unstack()
+
+# ----------------------------------------------------
+# LOAD DATA (from cache)
+# ----------------------------------------------------
 GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/simulation_results_full.xlsx"
 
-st.info("📡 Loading live simulation data from GitHub...")
-
 try:
-    # Download the Excel file from GitHub
-    response = requests.get(GITHUB_XLSX_URL)
-    response.raise_for_status()
-
-    # Read into DataFrame
-    df = pd.read_excel(BytesIO(response.content), sheet_name="Summary")
-
-    st.success("✅ Data successfully loaded from GitHub!")
+    df = load_data_from_github(GITHUB_XLSX_URL)
+    data_by_weight = preprocess(df)
+    st.success("✅ Data successfully loaded and cached from GitHub!")
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
     st.stop()
-    
-# ---------------------------------------------
+
+# ----------------------------------------------------
 # SIDEBAR FILTERS
-# ---------------------------------------------
+# ----------------------------------------------------
 st.sidebar.header("🎛️ Filter Parameters")
 
 weight_selected = st.sidebar.selectbox("Select Product Weight (kg)", sorted(df["Product_weight"].unique()))
@@ -41,16 +66,14 @@ co2_cost = st.sidebar.slider("CO₂ Manufacturing Cost (€ per ton)",
                              float(df["CO2_CostAtMfg"].min()), float(df["CO2_CostAtMfg"].max()),
                              float(df["CO2_CostAtMfg"].mean()), step=0.5)
 
-# Filter by product weight for simplicity
-subset = df[df["Product_weight"] == weight_selected]
+# ✅ Use preprocessed group to avoid repeated filtering
+subset = data_by_weight[weight_selected]
 
-# ---------------------------------------------
+# ----------------------------------------------------
 # KPI VIEW – Closest Scenario
-# ---------------------------------------------
+# ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
-closest = subset.loc[
-    (subset["CO2_percentage"] - co2_pct).abs().idxmin()
-]
+closest = subset.iloc[(subset["CO2_percentage"] - co2_pct).abs().argmin()]
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
@@ -59,72 +82,25 @@ col2.metric("Total CO₂", f"{closest['CO2_Total']:.2f}")
 col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}")
 col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}")
 
-# ---------------------------------------------
+# ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
-# ---------------------------------------------
+# ----------------------------------------------------
 if "f2_2" in df.columns:
     st.markdown("## 🏭 Factory Openings (f2_2)")
-    # Show frequency of factory openings under each CO₂%
-    pivot_factories = df.groupby(["CO2_percentage", "Product_weight"])["f2_2"].mean().reset_index()
+    pivot_factories = compute_pivot(df)
+
     fig_fact = px.imshow(
-        pivot_factories.pivot("Product_weight", "CO2_percentage", "f2_2"),
+        pivot_factories,
         aspect="auto",
         color_continuous_scale="Blues",
         title="Factory Opening Heatmap (1=open)",
         labels={"x": "CO₂ %", "y": "Product Weight"}
     )
     st.plotly_chart(fig_fact, use_container_width=True)
-    st.dataframe(pivot_factories, use_container_width=True)
+    st.dataframe(pivot_factories.reset_index(), use_container_width=True)
 
-# ---------------------------------------------
-# SENSITIVITY CHARTS
-# ---------------------------------------------
-st.markdown("## 🔍 Sensitivity of Key Costs")
-
-colA, colB = st.columns(2)
-
-# Objective vs CO₂ Manufacturing Cost
-fig_obj = px.line(
-    subset, x="CO2_CostAtMfg", y="Objective_value", color="CO2_percentage",
-    title="Objective Value vs CO₂ Manufacturing Cost",
-    markers=True, template="plotly_white"
-)
-colA.plotly_chart(fig_obj, use_container_width=True)
-
-# Total CO₂ vs Manufacturing Cost
-fig_co2 = px.line(
-    subset, x="CO2_CostAtMfg", y="CO2_Total", color="CO2_percentage",
-    title="Total CO₂ Emissions vs Manufacturing Cost",
-    markers=True, template="plotly_white"
-)
-colB.plotly_chart(fig_co2, use_container_width=True)
-
-# ---------------------------------------------
-# INVENTORY & TRANSPORT TREND
-# ---------------------------------------------
-st.markdown("## 📦 Inventory and 🚚 Transport Trends")
-
-subset["Inventory_Total"] = subset[["Inventory_L1", "Inventory_L2", "Inventory_L3"]].sum(axis=1)
-subset["Transport_Total"] = subset[["Transport_L1", "Transport_L2", "Transport_L3"]].sum(axis=1)
-
-colC, colD = st.columns(2)
-
-fig_inv = px.line(
-    subset, x="CO2_CostAtMfg", y="Inventory_Total", color="CO2_percentage",
-    title="Inventory Cost vs CO₂ Manufacturing Cost",
-    markers=True, template="plotly_white"
-)
-colC.plotly_chart(fig_inv, use_container_width=True)
-
-fig_tr = px.line(
-    subset, x="CO2_CostAtMfg", y="Transport_Total", color="CO2_percentage",
-    title="Transport Cost vs CO₂ Manufacturing Cost",
-    markers=True, template="plotly_white"
-)
-colD.plotly_chart(fig_tr, use_container_width=True)
-
-# ---------------------------------------------
+# ----------------------------------------------------
 # RAW DATA VIEW
-# ---------------------------------------------
+# ----------------------------------------------------
 with st.expander("📄 Show Full Summary Data"):
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df.head(1000), use_container_width=True)
