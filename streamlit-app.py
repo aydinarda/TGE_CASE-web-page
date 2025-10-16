@@ -269,7 +269,7 @@ f2_2_cols = [c for c in closest.index if c.startswith("f2_2_bin")]
 # Define coordinates (one per possible facility)
 facility_coords = {
     "f2_2_bin[HUDTG]": (49.61, 6.13),
-    "f2_2_bin[CZMC]":  (44.83, 20.42),
+    "f2_2_bin[CZMCT]":  (44.83, 20.42),
     "f2_2_bin[IEILG]": (47.09, 16.37),
     "f2_2_bin[FIMPF]": (50.45, 14.50),
     "f2_2_bin[PLZCA]": (42.70, 12.65),
