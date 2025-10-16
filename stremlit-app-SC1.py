@@ -96,12 +96,18 @@ if "Unit_penaltycost" in subset.columns:
     )
     subset = subset[subset["Unit_penaltycost"] == penalty_selected]
 
-# --- Detect correct CO₂ column automatically ---
-possible_co2_cols = [c for c in subset.columns if "co2" in c.lower() and "perc" in c.lower()]
+possible_co2_cols = [
+    c for c in subset.columns
+    if "co2" in c.lower() and any(x in c.lower() for x in ["%", "reduction", "percent", "perc"])
+]
+
 if possible_co2_cols:
     co2_col = possible_co2_cols[0]
 else:
-    st.error("❌ Could not find any CO₂ percentage column in this dataset.")
+    st.error(
+        "❌ Could not find any CO₂-related percentage column. "
+        "Make sure one of the columns includes terms like 'CO2', 'Reduction', or '%'."
+    )
     st.stop()
 
 co2_pct = st.sidebar.slider(
@@ -111,7 +117,6 @@ co2_pct = st.sidebar.slider(
     float(subset[co2_col].mean()),
     step=0.01
 )
-
 # ----------------------------------------------------
 # FIND CLOSEST SCENARIO
 # ----------------------------------------------------
