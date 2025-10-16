@@ -231,92 +231,112 @@ else:
     st.info("No emission breakdown columns found in this dataset.")
     
 # ----------------------------------------------------
-# WORLD MAP VISUALIZATION
+# 🌍 GLOBAL SUPPLY CHAIN MAP
 # ----------------------------------------------------
-st.markdown("## 🌍 Global Supply Chain Map")
+st.markdown("## 🌍 Global Supply Chain Network")
 
-# Example approximate coordinates (you can adjust as you like)
+# --- Plants (f1, China region) ---
 plants = pd.DataFrame({
-    "name": ["Plant 1", "Plant 2"],
-    "lat": [31.23, 22.32],   # China, Vietnam region
-    "lon": [121.47, 114.17],
-    "type": "Plant"
+    "Type": ["Plant", "Plant"],
+    "Lat": [31.23, 22.32],        # Shanghai & Southern China
+    "Lon": [121.47, 114.17]
 })
 
+# --- Cross-docks (f2) ---
 crossdocks = pd.DataFrame({
-    "name": ["Crossdock 1", "Crossdock 2", "Crossdock 3"],
-    "lat": [50.11, 48.86, 41.90],  # Germany, France, Italy
-    "lon": [8.68, 2.35, 12.48],
-    "type": "Crossdock"
+    "Type": ["Cross-dock"] * 3,
+    "Lat": [48.85, 50.11, 37.98],   # France, Germany, Greece
+    "Lon": [2.35, 8.68, 23.73]
 })
 
+# --- Distribution Centres (DCs) ---
 dcs = pd.DataFrame({
-    "name": ["DC 1", "DC 2", "DC 3", "DC 4"],
-    "lat": [52.52, 48.14, 46.95, 47.50],  # Central Europe
-    "lon": [13.40, 11.58, 7.44, 19.04],
-    "type": "Distribution Center"
+    "Type": ["Distribution Centre"] * 4,
+    "Lat": [47.50, 48.14, 46.95, 45.46],   # Central Europe
+    "Lon": [19.04, 11.58, 7.44, 9.19]
 })
 
+# --- Retailer Hubs (f3) ---
 retailers = pd.DataFrame({
-    "name": ["Retail 1", "Retail 2", "Retail 3", "Retail 4", "Retail 5"],
-    "lat": [55.67, 53.35, 51.50, 45.76, 43.30],  # Scandinavia, UK, France
-    "lon": [12.57, -6.26, -0.12, 4.83, 5.37],
-    "type": "Retailer"
+    "Type": ["Retailer Hub"] * 7,
+    "Lat": [55.67, 53.35, 51.50, 49.82, 45.76, 43.30, 40.42],  # North to South
+    "Lon": [12.57, -6.26, -0.12, 19.08, 4.83, 5.37, -3.70]
 })
 
-# 🆕 Show new facilities only if they are active in the current scenario
+# --- New Production Facilities (f2_2) ---
 if "f2_2_bin" in closest.index and closest["f2_2_bin"] == 1:
     new_facilities = pd.DataFrame({
-        "name": ["New Facility 1", "New Facility 2"],
-        "lat": [49.61, 44.83],
-        "lon": [6.13, 20.42],
-        "type": "New Facility"
+        "Type": ["New Production Facility"] * 5,
+        "Lat": [49.61, 44.83, 47.09, 50.45, 42.70],
+        "Lon": [6.13, 20.42, 16.37, 14.50, 12.65]
     })
 else:
-    new_facilities = pd.DataFrame(columns=["name", "lat", "lon", "type"])
+    new_facilities = pd.DataFrame(columns=["Type", "Lat", "Lon"])
 
-# Combine all locations
+# --- Combine all ---
 locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities])
 
-# Define colors and icons for each type
-symbol_map = {
-    "Plant": "factory",
-    "Crossdock": "triangle-up",
-    "Distribution Center": "warehouse",
-    "Retailer": "circle",
-    "New Facility": "star"
-}
-
+# --- Define colors & sizes ---
 color_map = {
     "Plant": "purple",
-    "Crossdock": "blue",
-    "Distribution Center": "black",
-    "Retailer": "red",
-    "New Facility": "cyan"
+    "Cross-dock": "dodgerblue",
+    "Distribution Centre": "black",
+    "Retailer Hub": "red",
+    "New Production Facility": "deepskyblue"
 }
 
-# Plot world map
+size_map = {
+    "Plant": 15,
+    "Cross-dock": 14,
+    "Distribution Centre": 16,
+    "Retailer Hub": 20,
+    "New Production Facility": 14
+}
+
+# --- Create Map ---
 fig_map = px.scatter_geo(
     locations,
-    lat="lat",
-    lon="lon",
-    color="type",
-    hover_name="name",
-    projection="natural earth",
-    title="Global Network Overview",
+    lat="Lat",
+    lon="Lon",
+    color="Type",
     color_discrete_map=color_map,
+    hover_name="Type",
+    projection="natural earth",
+    scope="world",
+    title="Global Supply Chain Structure",
+    template="plotly_white"
 )
 
-fig_map.update_traces(marker=dict(size=10, opacity=0.8, symbol="circle"))
+# Customize markers
+for trace in fig_map.data:
+    trace.marker.update(size=size_map[trace.name], opacity=0.9, line=dict(width=0.5, color='white'))
+
+fig_map.update_geos(
+    showcountries=True,
+    countrycolor="lightgray",
+    showland=True,
+    landcolor="rgb(245,245,245)",
+    fitbounds="locations"
+)
+
 fig_map.update_layout(
     height=550,
-    margin=dict(l=0, r=0, t=40, b=0),
-    geo=dict(showland=True, landcolor="rgb(240,240,240)")
+    margin=dict(l=0, r=0, t=40, b=0)
 )
 
 st.plotly_chart(fig_map, use_container_width=True)
 
-    
+# --- Legend ---
+st.markdown("""
+**Legend:**
+- 🏗️ **Cross-dock**  
+- 🏬 **Distribution Centre**  
+- 🔴 **Retailer Hub**  
+- ⚙️ **New Production Facility** *(shown only if f2_2_bin = 1)*  
+- 🏭 **Plant** (Asia)
+""")
+
+
 
 # ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
