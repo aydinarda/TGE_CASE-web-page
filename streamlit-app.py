@@ -179,6 +179,145 @@ if not filtered.empty:
 else:
     st.warning("No scenarios found for this exact combination to show sensitivity.")
     
+    
+# ----------------------------------------------------
+# EMISSION DISTRIBUTION BAR CHART
+# ----------------------------------------------------
+st.markdown("## 🌿 Emission Distribution (Tons)")
+
+# Extract emission components from the selected scenario
+emission_fields = [
+    "CO2_Prod_tons",
+    "CO2_LastMile_tons",
+    "CO2_Road_tons",
+    "CO2_Sea_tons",
+    "CO2_Air_tons"
+]
+
+# Filter to columns that exist in df
+existing_emission_fields = [f for f in emission_fields if f in closest.index]
+
+if existing_emission_fields:
+    emission_data = pd.DataFrame({
+        "Source": [
+            name.replace("CO2_", "").replace("_tons", "").replace("_", " ").title()
+            for name in existing_emission_fields
+        ],
+        "Emission (tons)": [closest[f] for f in existing_emission_fields]
+    }).sort_values("Emission (tons)", ascending=True)
+
+    fig_emission = px.bar(
+        emission_data,
+        x="Emission (tons)",
+        y="Source",
+        orientation="h",
+        text="Emission (tons)",
+        color="Emission (tons)",
+        color_continuous_scale="Greens",
+        title="Emission Distribution (Tons)",
+        template="plotly_white",
+    )
+
+    fig_emission.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+    fig_emission.update_layout(
+        xaxis_title="Emission (tons)",
+        yaxis_title="",
+        coloraxis_showscale=False,
+        height=400,
+    )
+
+    st.plotly_chart(fig_emission, use_container_width=True)
+else:
+    st.info("No emission breakdown columns found in this dataset.")
+    
+# ----------------------------------------------------
+# WORLD MAP VISUALIZATION
+# ----------------------------------------------------
+st.markdown("## 🌍 Global Supply Chain Map")
+
+# Example approximate coordinates (you can adjust as you like)
+plants = pd.DataFrame({
+    "name": ["Plant 1", "Plant 2"],
+    "lat": [31.23, 22.32],   # China, Vietnam region
+    "lon": [121.47, 114.17],
+    "type": "Plant"
+})
+
+crossdocks = pd.DataFrame({
+    "name": ["Crossdock 1", "Crossdock 2", "Crossdock 3"],
+    "lat": [50.11, 48.86, 41.90],  # Germany, France, Italy
+    "lon": [8.68, 2.35, 12.48],
+    "type": "Crossdock"
+})
+
+dcs = pd.DataFrame({
+    "name": ["DC 1", "DC 2", "DC 3", "DC 4"],
+    "lat": [52.52, 48.14, 46.95, 47.50],  # Central Europe
+    "lon": [13.40, 11.58, 7.44, 19.04],
+    "type": "Distribution Center"
+})
+
+retailers = pd.DataFrame({
+    "name": ["Retail 1", "Retail 2", "Retail 3", "Retail 4", "Retail 5"],
+    "lat": [55.67, 53.35, 51.50, 45.76, 43.30],  # Scandinavia, UK, France
+    "lon": [12.57, -6.26, -0.12, 4.83, 5.37],
+    "type": "Retailer"
+})
+
+# 🆕 Show new facilities only if they are active in the current scenario
+if "f2_2_bin" in closest.index and closest["f2_2_bin"] == 1:
+    new_facilities = pd.DataFrame({
+        "name": ["New Facility 1", "New Facility 2"],
+        "lat": [49.61, 44.83],
+        "lon": [6.13, 20.42],
+        "type": "New Facility"
+    })
+else:
+    new_facilities = pd.DataFrame(columns=["name", "lat", "lon", "type"])
+
+# Combine all locations
+locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities])
+
+# Define colors and icons for each type
+symbol_map = {
+    "Plant": "factory",
+    "Crossdock": "triangle-up",
+    "Distribution Center": "warehouse",
+    "Retailer": "circle",
+    "New Facility": "star"
+}
+
+color_map = {
+    "Plant": "purple",
+    "Crossdock": "blue",
+    "Distribution Center": "black",
+    "Retailer": "red",
+    "New Facility": "cyan"
+}
+
+# Plot world map
+fig_map = px.scatter_geo(
+    locations,
+    lat="lat",
+    lon="lon",
+    color="type",
+    hover_name="name",
+    projection="natural earth",
+    title="Global Network Overview",
+    color_discrete_map=color_map,
+)
+
+fig_map.update_traces(marker=dict(size=10, opacity=0.8, symbol="circle"))
+fig_map.update_layout(
+    height=550,
+    margin=dict(l=0, r=0, t=40, b=0),
+    geo=dict(showland=True, landcolor="rgb(240,240,240)")
+)
+
+st.plotly_chart(fig_map, use_container_width=True)
+
+    
+
 # ----------------------------------------------------
 # FACTORY OPENINGS (f2_2)
 # ----------------------------------------------------
