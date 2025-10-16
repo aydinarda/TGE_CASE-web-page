@@ -264,15 +264,37 @@ retailers = pd.DataFrame({
 })
 
 # --- New Production Facilities (f2_2) ---
-if "f2_2_bin" in closest.index and closest["f2_2_bin"] == 1:
+f2_2_cols = [c for c in closest.index if c.startswith("f2_2_bin")]
+
+# Define coordinates (one per possible facility)
+facility_coords = {
+    "f2_2_bin[HUDTG]": (49.61, 6.13),
+    "f2_2_bin[CZMC]":  (44.83, 20.42),
+    "f2_2_bin[IEILG]": (47.09, 16.37),
+    "f2_2_bin[FIMPF]": (50.45, 14.50),
+    "f2_2_bin[PLZCA]": (42.70, 12.65),
+}
+
+active_facilities = []
+for col in f2_2_cols:
+    try:
+        val = float(closest[col])
+        if val > 0.5 and col in facility_coords:
+            lat, lon = facility_coords[col]
+            active_facilities.append((col, lat, lon))
+    except Exception:
+        continue
+
+if active_facilities:
     new_facilities = pd.DataFrame({
-        "Type": ["New Production Facility"] * 5,
-        "Lat": [49.61, 44.83, 47.09, 50.45, 42.70],
-        "Lon": [6.13, 20.42, 16.37, 14.50, 12.65]
+        "Type": "New Production Facility",
+        "Lat": [lat for _, lat, _ in active_facilities],
+        "Lon": [lon for _, _, lon in active_facilities],
+        "Name": [col for col, _, _ in active_facilities]
     })
 else:
-    new_facilities = pd.DataFrame(columns=["Type", "Lat", "Lon"])
-
+    new_facilities = pd.DataFrame(columns=["Type", "Lat", "Lon", "Name"])
+    
 # --- Combine all ---
 locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities])
 
