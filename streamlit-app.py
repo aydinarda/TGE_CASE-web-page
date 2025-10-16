@@ -112,7 +112,7 @@ st.subheader("📊 Closest Scenario Details")
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Objective (€)", f"{closest['Objective_value']:.2f}")
+col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")
 col2.metric("Total CO₂", f"{closest['CO2_Total']:.2f}")
 col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}")
 col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}")
@@ -124,7 +124,7 @@ st.markdown("## 📈 Cost vs CO₂ Emission Sensitivity")
 
 # Let user choose which cost metric to plot
 cost_metric_map = {
-    "Objective Value (€)": "Objective_value",
+    "Total Cost (€)": "Objective_value",
     "Inventory Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3"],
     "Transport Cost (€)": ["Transport_L1", "Transport_L2", "Transport_L3"],
 }
@@ -357,6 +357,51 @@ st.markdown("""
 - ⚙️ **New Production Facility** *(shown only if f2_2_bin = 1)*  
 - 🏭 **Plant** (Asia)
 """)
+
+
+# ----------------------------------------------------
+# 🚚 TRANSPORT FLOW SUMMARY BY LAYER (f1, f2, f2_2, f3)
+# ----------------------------------------------------
+st.markdown("## 🚢✈️🚛 Transport Flow Summary")
+
+def display_layer_summary(title, layer_prefix, include_road=True):
+    """Display total sea/air/road flow for a given layer prefix (f1, f2, f2_2, f3)."""
+    sea_cols = [c for c in df.columns if c.lower().startswith(f"sea_{layer_prefix.lower()}")]
+    air_cols = [c for c in df.columns if c.lower().startswith(f"air_{layer_prefix.lower()}")]
+    road_cols = [c for c in df.columns if c.lower().startswith(f"road_{layer_prefix.lower()}")] if include_road else []
+
+    def total_for(cols):
+        return sum(float(closest[c]) for c in cols if pd.notna(closest.get(c, 0)))
+
+    sea = total_for(sea_cols)
+    air = total_for(air_cols)
+    road = total_for(road_cols) if include_road else 0
+
+    total = sea + air + road
+
+    st.markdown(f"### {title}")
+    cols = st.columns(3 if include_road else 2)
+    cols[0].metric("🚢 Sea", f"{sea:,.0f} units")
+    cols[1].metric("✈️ Air", f"{air:,.0f} units")
+    if include_road:
+        cols[2].metric("🚛 Road", f"{road:,.0f} units")
+
+    if total == 0:
+        st.info("No transport activity recorded.")
+    st.markdown("---")
+
+# 🏭 Layer 1: Plants → Cross-docks
+display_layer_summary("Layer 1: Plants → Cross-docks (f1)", "f1", include_road=False)
+
+# 🏗️ Layer 2a: Cross-docks → DCs
+display_layer_summary("Layer 2a: Cross-docks → DCs (f2)", "f2", include_road=True)
+
+# ⚙️ Layer 2b: New Facilities → DCs (f2_2)
+display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include_road=True)
+
+# 🏬 Layer 3: DCs → Retailers
+display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
+
 
 
 
