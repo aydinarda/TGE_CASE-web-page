@@ -354,8 +354,8 @@ st.markdown("""
 - 🏗️ **Cross-dock**  
 - 🏬 **Distribution Centre**  
 - 🔴 **Retailer Hub**  
-- ⚙️ **New Production Facility** *(shown only if f2_2_bin = 1)*  
-- 🏭 **Plant** (Asia)
+- ⚙️ **New Production Facility**  
+- 🏭 **Plant** 
 """)
 
 
