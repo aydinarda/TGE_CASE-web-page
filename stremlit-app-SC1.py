@@ -193,16 +193,27 @@ fig = px.scatter(
     title=f"{selected_metric_label} vs CO₂ Emissions ({selected_sheet})"
 )
 
+# Compute the Y value safely (Selected Cost)
+if "Selected_Cost" in closest.index:
+    closest_y = closest["Selected_Cost"]
+else:
+    # If column missing, compute from selected metric mapping
+    if isinstance(cost_metric_map[selected_metric_label], list):
+        cols_to_sum = [c for c in cost_metric_map[selected_metric_label] if c in closest.index]
+        closest_y = closest[cols_to_sum].sum()
+    else:
+        closest_y = closest.get(cost_metric_map[selected_metric_label], 0)
+
+# Add the point on the chart
 fig.add_scatter(
     x=[closest[x_col]],
-    y=[closest["Selected_Cost"]],
+    y=[closest_y],
     mode="markers+text",
     marker=dict(size=14, color="red"),
     text=["Selected Scenario"],
     textposition="top center",
     name="Selected"
 )
-st.plotly_chart(fig, use_container_width=True)
 
 # ----------------------------------------------------
 # 🌍 SUPPLY CHAIN MAP
