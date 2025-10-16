@@ -96,6 +96,9 @@ if "Unit_penaltycost" in subset.columns:
     )
     subset = subset[subset["Unit_penaltycost"] == penalty_selected]
 
+# ----------------------------------------------------
+# DETECT CO₂ REDUCTION COLUMN AUTOMATICALLY
+# ----------------------------------------------------
 possible_co2_cols = [
     c for c in subset.columns
     if "co2" in c.lower() and any(x in c.lower() for x in ["%", "reduction", "percent", "perc"])
@@ -110,6 +113,7 @@ else:
     )
     st.stop()
 
+# Create slider for CO2 Reduction %
 co2_pct = st.sidebar.slider(
     f"CO₂ Reduction Target ({co2_col})",
     float(subset[co2_col].min()),
@@ -117,10 +121,11 @@ co2_pct = st.sidebar.slider(
     float(subset[co2_col].mean()),
     step=0.01
 )
+
 # ----------------------------------------------------
 # FIND CLOSEST SCENARIO
 # ----------------------------------------------------
-closest = subset.iloc[(subset["CO2_percentage"] - co2_pct).abs().argmin()]
+closest = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
 
 # ----------------------------------------------------
 # KPI SUMMARY
@@ -131,11 +136,11 @@ st.write(closest.to_frame().T)
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
     "Total Cost (€)",
-    f"{closest['Total Cost'] if 'Total Cost' in closest else closest['Objective_value']:.2f}"
+    f"{closest['Total Cost'] if 'Total Cost' in closest else closest.get('Objective_value', 0):.2f}"
 )
 col2.metric(
     "Total CO₂ (tons)",
-    f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest['CO2_Total']:.2f}"
+    f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest.get('CO2_Total', 0):.2f}"
 )
 col3.metric(
     "Inventory Total (€)",
@@ -176,18 +181,20 @@ else:
 
 y_label = selected_metric_label
 
+x_col = "Total Emissions" if "Total Emissions" in filtered.columns else "CO2_Total"
+
 fig = px.scatter(
     filtered,
-    x="Total Emissions" if "Total Emissions" in filtered.columns else "CO2_Total",
+    x=x_col,
     y="Selected_Cost",
-    color="CO2_percentage",
+    color=co2_col,
     template="plotly_white",
     color_continuous_scale="Viridis",
     title=f"{selected_metric_label} vs CO₂ Emissions ({selected_sheet})"
 )
 
 fig.add_scatter(
-    x=[closest["Total Emissions"] if "Total Emissions" in closest else closest["CO2_Total"]],
+    x=[closest[x_col]],
     y=[closest["Selected_Cost"]],
     mode="markers+text",
     marker=dict(size=14, color="red"),
