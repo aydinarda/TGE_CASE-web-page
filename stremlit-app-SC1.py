@@ -278,39 +278,42 @@ fig_map.update_layout(height=550, margin=dict(l=0, r=0, t=40, b=0))
 st.plotly_chart(fig_map, use_container_width=True)
 
 # ----------------------------------------------------
-# 🚢✈️🚛 FLOW SUMMARY
+# 🚢✈️🚛 FLOW SUMMARY (using LayerX naming)
 # ----------------------------------------------------
 st.markdown("## 🚚 Transport Flows by Mode")
 
-def sum_flows_by_mode(prefix):
-    flow_cols = [c for c in df.columns if c.startswith(prefix + "[")]
-    totals = {"air": 0.0, "sea": 0.0, "road": 0.0}
-    for col in flow_cols:
-        match = re.search(r",\s*([a-zA-Z]+)\]$", col)
-        if match:
-            mode = match.group(1).lower()
-            if mode in totals:
-                try:
-                    totals[mode] += float(closest[col])
-                except:
-                    pass
-    return totals
+# --- Helper to read totals safely ---
+def get_value_safe(col):
+    return float(closest[col]) if col in closest.index else 0.0
 
-def display_layer_summary(title, prefix, include_road=True):
-    totals = sum_flows_by_mode(prefix)
-    st.markdown(f"### {title}")
-    cols = st.columns(3 if include_road else 2)
-    cols[0].metric("🚢 Sea", f"{totals['sea']:,.0f} units")
-    cols[1].metric("✈️ Air", f"{totals['air']:,.0f} units")
-    if include_road:
-        cols[2].metric("🚛 Road", f"{totals['road']:,.0f} units")
-    if sum(totals.values()) == 0:
-        st.info("No transport activity recorded for this layer.")
-    st.markdown("---")
+# --- Layer 1: Plants → Cross-docks ---
+st.markdown("### Layer 1: Plants → Cross-docks (f1)")
+col1, col2 = st.columns(2)
+col1.metric("🚢 Sea", f"{get_value_safe('Layer1Sea'):,.0f} units")
+col2.metric("✈️ Air", f"{get_value_safe('Layer1Air'):,.0f} units")
+if get_value_safe("Layer1Sea") + get_value_safe("Layer1Air") == 0:
+    st.info("No transport activity recorded for this layer.")
+st.markdown("---")
 
-display_layer_summary("Layer 1: Plants → Cross-docks (f1)", "f1", include_road=False)
-display_layer_summary("Layer 2: Cross-docks → DCs (f2)", "f2", include_road=True)
-display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
+# --- Layer 2: Cross-docks → DCs ---
+st.markdown("### Layer 2: Cross-docks → DCs (f2)")
+col1, col2, col3 = st.columns(3)
+col1.metric("🚢 Sea", f"{get_value_safe('Layer2Sea'):,.0f} units")
+col2.metric("✈️ Air", f"{get_value_safe('Layer2Air'):,.0f} units")
+col3.metric("🚛 Road", f"{get_value_safe('Layer2Road'):,.0f} units")
+if get_value_safe("Layer2Sea") + get_value_safe("Layer2Air") + get_value_safe("Layer2Road") == 0:
+    st.info("No transport activity recorded for this layer.")
+st.markdown("---")
+
+# --- Layer 3: DCs → Retailers ---
+st.markdown("### Layer 3: DCs → Retailers (f3)")
+col1, col2, col3 = st.columns(3)
+col1.metric("🚢 Sea", f"{get_value_safe('Layer3Sea'):,.0f} units")
+col2.metric("✈️ Air", f"{get_value_safe('Layer3Air'):,.0f} units")
+col3.metric("🚛 Road", f"{get_value_safe('Layer3Road'):,.0f} units")
+if get_value_safe("Layer3Sea") + get_value_safe("Layer3Air") + get_value_safe("Layer3Road") == 0:
+    st.info("No transport activity recorded for this layer.")
+st.markdown("---")
 
 # ----------------------------------------------------
 # RAW DATA VIEW
