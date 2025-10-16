@@ -23,22 +23,25 @@ st.set_page_config(
 st.title("🏭 Simplified CO₂ Supply Chain Dashboard (SC1F Model)")
 
 # ----------------------------------------------------
-# LOAD DATA (cached)
+# SAFE CACHED DATA LOADER
 # ----------------------------------------------------
 @st.cache_data(show_spinner="📡 Fetching data from GitHub...")
 def load_excel_from_github(url: str):
-    """Load Excel file from GitHub (cached)."""
+    """Load all Excel sheets into a dict of DataFrames (pickle-safe)."""
     response = requests.get(url)
     response.raise_for_status()
-    xls = pd.ExcelFile(BytesIO(response.content))
-    return xls
+    excel_data = pd.read_excel(BytesIO(response.content), sheet_name=None)
+    return excel_data  # dictionary of {sheet_name: DataFrame}
 
 # 👉 Replace with your GitHub-hosted file URL when public
-GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/simulation_results_demand_levels.xlsx"
+GITHUB_XLSX_URL = (
+    "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/"
+    "simulation_results_demand_levels.xlsx"
+)
 
 try:
-    xls = load_excel_from_github(GITHUB_XLSX_URL)
-    sheet_names = [s for s in xls.sheet_names if s.startswith("Array_")]
+    excel_data = load_excel_from_github(GITHUB_XLSX_URL)
+    sheet_names = [s for s in excel_data.keys() if s.startswith("Array_")]
     if not sheet_names:
         st.error("❌ No sheets starting with 'Array_' found.")
         st.stop()
@@ -52,13 +55,13 @@ except Exception as e:
 # ----------------------------------------------------
 st.sidebar.header("🎛️ Model Controls")
 
-# Extract numeric demand levels (e.g., "Array_90%" → 90)
+# Extract numeric levels automatically (e.g., Array_90% → 90)
 levels = sorted(
     [int(re.findall(r"\d+", name)[0]) for name in sheet_names],
     reverse=True
 )
 
-# Demand-level slider
+# Slider to pick demand level
 selected_level = st.sidebar.slider(
     "Select Demand Level (%)",
     min_value=min(levels),
@@ -70,11 +73,11 @@ selected_level = st.sidebar.slider(
 selected_sheet = f"Array_{selected_level}%"
 st.sidebar.write(f"📄 Using sheet: `{selected_sheet}`")
 
-# Load the selected sheet
-df = pd.read_excel(xls, sheet_name=selected_sheet)
+# Load selected sheet
+df = excel_data[selected_sheet]
 
 # ----------------------------------------------------
-# OPTIONAL FILTERS (only those existing in dataset)
+# OPTIONAL FILTERS
 # ----------------------------------------------------
 if "Product_weight" in df.columns:
     weight_selected = st.sidebar.selectbox(
@@ -113,8 +116,14 @@ st.subheader("📊 Closest Scenario Details")
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Cost (€)", f"{closest['Total Cost'] if 'Total Cost' in closest else closest['Objective_value']:.2f}")
-col2.metric("Total CO₂ (tons)", f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest['CO2_Total']:.2f}")
+col1.metric(
+    "Total Cost (€)",
+    f"{closest['Total Cost'] if 'Total Cost' in closest else closest['Objective_value']:.2f}"
+)
+col2.metric(
+    "Total CO₂ (tons)",
+    f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest['CO2_Total']:.2f}"
+)
 col3.metric(
     "Inventory Total (€)",
     f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}"
@@ -279,7 +288,7 @@ with st.expander("📄 Show Full Data Table"):
     st.dataframe(df.head(500), use_container_width=True)
 
 # ----------------------------------------------------
-# 🌐 FOOTER LINK TO FULL MODEL
+# 🌐 FOOTER LINK
 # ----------------------------------------------------
 st.markdown(
     """
