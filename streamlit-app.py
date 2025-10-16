@@ -360,46 +360,48 @@ st.markdown("""
 
 
 # ----------------------------------------------------
-# 🚚 TRANSPORT FLOW SUMMARY BY LAYER (f1, f2, f2_2, f3)
+# 🚢✈️🚛 FLOW SUMMARY BY MODE PER LAYER (f1, f2, f2_2, f3)
 # ----------------------------------------------------
-st.markdown("## 🚢✈️🚛 Transport Flow Summary")
+st.markdown("## 🚚 Transport Flows by Mode")
 
-def display_layer_summary(title, layer_prefix, include_road=True):
-    """Display total sea/air/road flow for a given layer prefix (f1, f2, f2_2, f3)."""
-    sea_cols = [c for c in df.columns if c.lower().startswith(f"sea_{layer_prefix.lower()}")]
-    air_cols = [c for c in df.columns if c.lower().startswith(f"air_{layer_prefix.lower()}")]
-    road_cols = [c for c in df.columns if c.lower().startswith(f"road_{layer_prefix.lower()}")] if include_road else []
+import re
 
-    def total_for(cols):
-        return sum(float(closest[c]) for c in cols if pd.notna(closest.get(c, 0)))
+def sum_flows_by_mode(prefix):
+    """Sum up air/sea/road units for a given flow prefix like 'f1', 'f2', 'f2_2', or 'f3'."""
+    flow_cols = [c for c in df.columns if c.startswith(prefix + "[")]
+    totals = {"air": 0.0, "sea": 0.0, "road": 0.0}
 
-    sea = total_for(sea_cols)
-    air = total_for(air_cols)
-    road = total_for(road_cols) if include_road else 0
+    for col in flow_cols:
+        # Extract mode from inside brackets, e.g. f2_2[CZMC,DEBER,road]
+        match = re.search(r",\s*([a-zA-Z]+)\]$", col)
+        if match:
+            mode = match.group(1).lower()
+            if mode in totals:
+                try:
+                    totals[mode] += float(closest[col])
+                except:
+                    pass
+    return totals
 
-    total = sea + air + road
 
+def display_layer_summary(title, prefix, include_road=True):
+    totals = sum_flows_by_mode(prefix)
     st.markdown(f"### {title}")
     cols = st.columns(3 if include_road else 2)
-    cols[0].metric("🚢 Sea", f"{sea:,.0f} units")
-    cols[1].metric("✈️ Air", f"{air:,.0f} units")
+    cols[0].metric("🚢 Sea", f"{totals['sea']:,.0f} units")
+    cols[1].metric("✈️ Air", f"{totals['air']:,.0f} units")
     if include_road:
-        cols[2].metric("🚛 Road", f"{road:,.0f} units")
+        cols[2].metric("🚛 Road", f"{totals['road']:,.0f} units")
 
-    if total == 0:
-        st.info("No transport activity recorded.")
+    if sum(totals.values()) == 0:
+        st.info("No transport activity recorded for this layer.")
     st.markdown("---")
 
-# 🏭 Layer 1: Plants → Cross-docks
+
+# Layer summaries
 display_layer_summary("Layer 1: Plants → Cross-docks (f1)", "f1", include_road=False)
-
-# 🏗️ Layer 2a: Cross-docks → DCs
 display_layer_summary("Layer 2a: Cross-docks → DCs (f2)", "f2", include_road=True)
-
-# ⚙️ Layer 2b: New Facilities → DCs (f2_2)
 display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include_road=True)
-
-# 🏬 Layer 3: DCs → Retailers
 display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
 
 
