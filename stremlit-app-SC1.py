@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Oct 16 22:34:47 2025
-
-@author: Arda Aydın
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Streamlit Dashboard – Simplified Supply Chain Model (SC1F)
-Author: Arda Aydın (for public deployment)
+Author: Arda Aydın
 """
 
 import streamlit as st
@@ -33,56 +26,85 @@ st.title("🏭 Simplified CO₂ Supply Chain Dashboard (SC1F Model)")
 # LOAD DATA (cached)
 # ----------------------------------------------------
 @st.cache_data(show_spinner="📡 Fetching data from GitHub...")
-def load_data(url: str):
+def load_excel_from_github(url: str):
+    """Load Excel file from GitHub (cached)."""
     response = requests.get(url)
     response.raise_for_status()
-    return pd.read_excel(BytesIO(response.content), sheet_name=0)
+    xls = pd.ExcelFile(BytesIO(response.content))
+    return xls
 
-# 👉 Replace with your GitHub-hosted Excel file URL
+# 👉 Replace with your GitHub-hosted file URL when public
 GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/simulation_results_demand_levels.xlsx"
 
 try:
-    df = load_data(GITHUB_XLSX_URL)
-    st.success("✅ Data successfully loaded!")
+    xls = load_excel_from_github(GITHUB_XLSX_URL)
+    sheet_names = [s for s in xls.sheet_names if s.startswith("Array_")]
+    if not sheet_names:
+        st.error("❌ No sheets starting with 'Array_' found.")
+        st.stop()
+    st.success(f"✅ Loaded {len(sheet_names)} demand-level sheets.")
 except Exception as e:
-    st.error(f"❌ Failed to load data: {e}")
+    st.error(f"❌ Failed to load Excel file: {e}")
     st.stop()
 
 # ----------------------------------------------------
-# SIDEBAR FILTERS
+# SIDEBAR CONTROLS
 # ----------------------------------------------------
-st.sidebar.header("🎛️ Filter Parameters")
+st.sidebar.header("🎛️ Model Controls")
 
-# Only include relevant sidebar controls for SC1F model
-if "product_weight" in df.columns:
+# Extract numeric demand levels (e.g., "Array_90%" → 90)
+levels = sorted(
+    [int(re.findall(r"\d+", name)[0]) for name in sheet_names],
+    reverse=True
+)
+
+# Demand-level slider
+selected_level = st.sidebar.slider(
+    "Select Demand Level (%)",
+    min_value=min(levels),
+    max_value=max(levels),
+    step=5,
+    value=max(levels)
+)
+
+selected_sheet = f"Array_{selected_level}%"
+st.sidebar.write(f"📄 Using sheet: `{selected_sheet}`")
+
+# Load the selected sheet
+df = pd.read_excel(xls, sheet_name=selected_sheet)
+
+# ----------------------------------------------------
+# OPTIONAL FILTERS (only those existing in dataset)
+# ----------------------------------------------------
+if "Product_weight" in df.columns:
     weight_selected = st.sidebar.selectbox(
-        "Select Product Weight (kg)",
-        sorted(df["product_weight"].unique())
+        "Product Weight (kg)",
+        sorted(df["Product_weight"].unique())
     )
-    subset = df[df["product_weight"] == weight_selected]
+    subset = df[df["Product_weight"] == weight_selected]
 else:
     subset = df.copy()
 
-if "unit_penaltycost" in subset.columns:
+if "Unit_penaltycost" in subset.columns:
     penalty_selected = st.sidebar.select_slider(
         "Penalty Cost (€/unit)",
-        options=sorted(subset["unit_penaltycost"].unique()),
-        value=subset["unit_penaltycost"].iloc[0]
+        options=sorted(subset["Unit_penaltycost"].unique()),
+        value=subset["Unit_penaltycost"].iloc[0]
     )
-    subset = subset[subset["unit_penaltycost"] == penalty_selected]
+    subset = subset[subset["Unit_penaltycost"] == penalty_selected]
 
 co2_pct = st.sidebar.slider(
-    "CO₂ Reduction Percentage",
-    float(subset["CO_2_percentage"].min()),
-    float(subset["CO_2_percentage"].max()),
-    float(subset["CO_2_percentage"].mean()),
+    "CO₂ Reduction Target",
+    float(subset["CO2_percentage"].min()),
+    float(subset["CO2_percentage"].max()),
+    float(subset["CO2_percentage"].mean()),
     step=0.01
 )
 
 # ----------------------------------------------------
 # FIND CLOSEST SCENARIO
 # ----------------------------------------------------
-closest = subset.iloc[(subset["CO_2_percentage"] - co2_pct).abs().argmin()]
+closest = subset.iloc[(subset["CO2_percentage"] - co2_pct).abs().argmin()]
 
 # ----------------------------------------------------
 # KPI SUMMARY
@@ -91,10 +113,20 @@ st.subheader("📊 Closest Scenario Details")
 st.write(closest.to_frame().T)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")
-col2.metric("Total CO₂ (tons)", f"{closest['CO2_Total']:.2f}")
-col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}")
-col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}")
+col1.metric("Total Cost (€)", f"{closest['Total Cost'] if 'Total Cost' in closest else closest['Objective_value']:.2f}")
+col2.metric("Total CO₂ (tons)", f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest['CO2_Total']:.2f}")
+col3.metric(
+    "Inventory Total (€)",
+    f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}"
+    if all(c in closest for c in ['Inventory_L1','Inventory_L2','Inventory_L3'])
+    else "N/A"
+)
+col4.metric(
+    "Transport Total (€)",
+    f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}"
+    if all(c in closest for c in ['Transport_L1','Transport_L2','Transport_L3'])
+    else "N/A"
+)
 
 # ----------------------------------------------------
 # COST vs EMISSION PLOT
@@ -102,7 +134,7 @@ col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','
 st.markdown("## 📈 Cost vs CO₂ Emission Sensitivity")
 
 cost_metric_map = {
-    "Total Cost (€)": "Objective_value",
+    "Total Cost (€)": "Objective_value" if "Objective_value" in df.columns else "Total Cost",
     "Inventory Cost (€)": ["Inventory_L1", "Inventory_L2", "Inventory_L3"],
     "Transport Cost (€)": ["Transport_L1", "Transport_L2", "Transport_L3"],
 }
@@ -115,26 +147,26 @@ selected_metric_label = st.selectbox(
 
 filtered = subset.copy()
 if isinstance(cost_metric_map[selected_metric_label], list):
-    filtered["Selected_Cost"] = filtered[cost_metric_map[selected_metric_label]].sum(axis=1)
-    y_label = selected_metric_label
+    cols_to_sum = [c for c in cost_metric_map[selected_metric_label] if c in filtered.columns]
+    filtered["Selected_Cost"] = filtered[cols_to_sum].sum(axis=1)
 else:
     filtered["Selected_Cost"] = filtered[cost_metric_map[selected_metric_label]]
-    y_label = selected_metric_label
+
+y_label = selected_metric_label
 
 fig = px.scatter(
     filtered,
-    x="CO2_Total",
+    x="Total Emissions" if "Total Emissions" in filtered.columns else "CO2_Total",
     y="Selected_Cost",
-    color="CO_2_percentage",
+    color="CO2_percentage",
     template="plotly_white",
-    title=f"{selected_metric_label} vs Total CO₂ (tons)",
-    labels={"CO2_Total": "Total CO₂ Emissions (tons)", "Selected_Cost": y_label},
-    color_continuous_scale="Viridis"
+    color_continuous_scale="Viridis",
+    title=f"{selected_metric_label} vs CO₂ Emissions ({selected_sheet})"
 )
 
 fig.add_scatter(
-    x=[closest["CO2_Total"]],
-    y=[closest["Objective_value"]],
+    x=[closest["Total Emissions"] if "Total Emissions" in closest else closest["CO2_Total"]],
+    y=[closest["Selected_Cost"]],
     mode="markers+text",
     marker=dict(size=14, color="red"),
     text=["Selected Scenario"],
@@ -173,7 +205,6 @@ retailers = pd.DataFrame({
 })
 
 locations = pd.concat([plants, crossdocks, dcs, retailers])
-
 color_map = {
     "Plant": "purple",
     "Cross-dock": "dodgerblue",
