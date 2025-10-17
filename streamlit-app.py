@@ -404,9 +404,8 @@ display_layer_summary("Layer 2a: Cross-docks → DCs (f2)", "f2", include_road=T
 display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include_road=True)
 display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
 
-
 # ----------------------------------------------------
-# 💰 COST & 🌿 EMISSION DISTRIBUTION VISUALS
+# 💰 COST & 🌿 EMISSION DISTRIBUTION VISUALS (Corrected)
 # ----------------------------------------------------
 st.markdown("## 💰 Cost and 🌿 Emission Distribution")
 
@@ -420,17 +419,40 @@ cost_labels = [
     "Inventory Cost"
 ]
 
-# extract values safely from closest row
-transport_cost = closest.get("Transport_L1", 0) + closest.get("Transport_L2", 0) + closest.get("Transport_L3", 0)
-handling_cost = closest.get("Handling_total", 0) if "Handling_total" in closest else closest.get("Handling", 0)
-co2_prod_cost = closest.get("CO2_CostAtMfg", 0) * closest.get("CO2_Prod_tons", 0)
+# Compute from closest scenario row
+transport_cost = (
+    closest.get("Transport_L1", 0) +
+    closest.get("Transport_L2", 0) +
+    closest.get("Transport_L3", 0)
+)
+
+# 🧩 Corrected sourcing/handling combination
+sourcing_handling_cost = (
+    closest.get("Sourcing_L1", 0) +
+    closest.get("Handling_L2_total", 0) +
+    closest.get("Handling_L3", 0)
+)
+
+# 🧩 Corrected CO₂ cost in manufacturing
+co2_prod_cost = (
+    closest.get("CO2_Cost_L2_2", 0) +
+    closest.get("CO2_Manufacturing_State1", 0)
+)
+
+# Inventory cost
 inventory_cost = (
     closest.get("Inventory_L1", 0) +
     closest.get("Inventory_L2", 0) +
     closest.get("Inventory_L3", 0)
 )
 
-cost_values = [transport_cost, handling_cost, co2_prod_cost, inventory_cost]
+cost_values = [
+    transport_cost,
+    sourcing_handling_cost,
+    co2_prod_cost,
+    inventory_cost
+]
+
 cost_colors = ["#AECBFA", "#D3D3D3", "#FFD24C", "#6B7A8F"]
 
 fig_cost = go.Figure()
@@ -491,47 +513,6 @@ with col2:
 
 
 
-# ----------------------------------------------------
-# 🏭 FACTORY OPENINGS (f2_2)
-# ----------------------------------------------------
-st.markdown("## 🏭 Factory Openings (f2_2)")
-
-# Find all binary facility-opening columns
-f2_2_bin_cols = [c for c in df.columns if c.startswith("f2_2_bin")]
-
-if len(f2_2_bin_cols) == 0:
-    st.info("No f2_2_bin columns found in dataset.")
-else:
-    # Count how many new facilities are opened in each scenario
-    df["f2_2_open_count"] = df[f2_2_bin_cols].sum(axis=1)
-
-    # Create pivot by CO₂ percentage and product weight
-    pivot_factories = (
-        df.groupby(["CO2_percentage", "Product_weight"])["f2_2_open_count"]
-        .mean()
-        .unstack()
-    )
-
-    # Create heatmap
-    fig_fact = px.imshow(
-        pivot_factories,
-        aspect="auto",
-        color_continuous_scale="Blues",
-        title="Number of New Facilities Opened (f2_2_bin)",
-        labels={"x": "Product Weight (kg)", "y": "CO₂ %"},
-    )
-
-    fig_fact.update_layout(
-        coloraxis_colorbar=dict(
-            title="Avg. # of New Facilities Opened",
-            tickformat=".0f"
-        )
-    )
-
-    st.plotly_chart(fig_fact, use_container_width=True)
-
-    # Show underlying table
-    st.dataframe(pivot_factories.reset_index(), use_container_width=True)
 
 # ----------------------------------------------------
 # RAW DATA VIEW
