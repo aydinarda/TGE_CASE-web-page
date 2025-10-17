@@ -405,23 +405,132 @@ display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include
 display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
 
 
+# ----------------------------------------------------
+# 💰 COST & 🌿 EMISSION DISTRIBUTION VISUALS
+# ----------------------------------------------------
+st.markdown("## 💰 Cost and 🌿 Emission Distribution")
+
+import plotly.graph_objects as go
+
+# ---------- COST DISTRIBUTION ----------
+cost_labels = [
+    "Transportation Cost",
+    "Sourcing/Handling Cost",
+    "CO₂ Cost in Production",
+    "Inventory Cost"
+]
+
+# extract values safely from closest row
+transport_cost = closest.get("Transport_L1", 0) + closest.get("Transport_L2", 0) + closest.get("Transport_L3", 0)
+handling_cost = closest.get("Handling_total", 0) if "Handling_total" in closest else closest.get("Handling", 0)
+co2_prod_cost = closest.get("CO2_CostAtMfg", 0) * closest.get("CO2_Prod_tons", 0)
+inventory_cost = (
+    closest.get("Inventory_L1", 0) +
+    closest.get("Inventory_L2", 0) +
+    closest.get("Inventory_L3", 0)
+)
+
+cost_values = [transport_cost, handling_cost, co2_prod_cost, inventory_cost]
+cost_colors = ["#AECBFA", "#D3D3D3", "#FFD24C", "#6B7A8F"]
+
+fig_cost = go.Figure()
+fig_cost.add_trace(go.Bar(
+    x=cost_labels,
+    y=cost_values,
+    text=[f"{v:,.0f}" for v in cost_values],
+    textposition="outside",
+    marker_color=cost_colors
+))
+
+fig_cost.update_layout(
+    title="Cost Distribution",
+    title_font=dict(size=18, family="Arial Black"),
+    xaxis=dict(title="", tickfont=dict(size=13, family="Arial Black")),
+    yaxis=dict(title="", showgrid=False),
+    template="plotly_white",
+    height=400,
+    margin=dict(t=60, l=30, r=30, b=30)
+)
+
+# ---------- EMISSION DISTRIBUTION ----------
+emission_labels = ["Air", "Sea", "Road", "Last-mile", "Production"]
+emission_values = [
+    closest.get("CO2_Air_tons", 0),
+    closest.get("CO2_Sea_tons", 0),
+    closest.get("CO2_Road_tons", 0),
+    closest.get("CO2_LastMile_tons", 0),
+    closest.get("CO2_Prod_tons", 0)
+]
+emission_colors = ["#AECBFA", "#0077C8", "#999999", "#FFD24C", "#B0B6C4"]
+
+fig_emis = go.Figure()
+fig_emis.add_trace(go.Bar(
+    x=emission_labels,
+    y=emission_values,
+    text=[f"{v:,.0f}" for v in emission_values],
+    textposition="outside",
+    marker_color=emission_colors
+))
+
+fig_emis.update_layout(
+    title="Emission Distribution",
+    title_font=dict(size=18, family="Arial Black"),
+    xaxis=dict(title="", tickfont=dict(size=13, family="Arial Black")),
+    yaxis=dict(title="", showgrid=False),
+    template="plotly_white",
+    height=400,
+    margin=dict(t=60, l=30, r=30, b=30)
+)
+
+# ---------- SIDE-BY-SIDE DISPLAY ----------
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(fig_cost, use_container_width=True)
+with col2:
+    st.plotly_chart(fig_emis, use_container_width=True)
+
 
 
 # ----------------------------------------------------
-# FACTORY OPENINGS (f2_2)
+# 🏭 FACTORY OPENINGS (f2_2)
 # ----------------------------------------------------
-if "f2_2" in df.columns:
-    st.markdown("## 🏭 Factory Openings (f2_2)")
-    pivot_factories = compute_pivot(df)
+st.markdown("## 🏭 Factory Openings (f2_2)")
 
+# Find all binary facility-opening columns
+f2_2_bin_cols = [c for c in df.columns if c.startswith("f2_2_bin")]
+
+if len(f2_2_bin_cols) == 0:
+    st.info("No f2_2_bin columns found in dataset.")
+else:
+    # Count how many new facilities are opened in each scenario
+    df["f2_2_open_count"] = df[f2_2_bin_cols].sum(axis=1)
+
+    # Create pivot by CO₂ percentage and product weight
+    pivot_factories = (
+        df.groupby(["CO2_percentage", "Product_weight"])["f2_2_open_count"]
+        .mean()
+        .unstack()
+    )
+
+    # Create heatmap
     fig_fact = px.imshow(
         pivot_factories,
         aspect="auto",
         color_continuous_scale="Blues",
-        title="Factory Opening Heatmap (1=open)",
-        labels={"x": "CO₂ %", "y": "Product Weight"}
+        title="Number of New Facilities Opened (f2_2_bin)",
+        labels={"x": "Product Weight (kg)", "y": "CO₂ %"},
     )
+
+    fig_fact.update_layout(
+        coloraxis_colorbar=dict(
+            title="Avg. # of New Facilities Opened",
+            tickformat=".0f"
+        )
+    )
+
     st.plotly_chart(fig_fact, use_container_width=True)
+
+    # Show underlying table
     st.dataframe(pivot_factories.reset_index(), use_container_width=True)
 
 # ----------------------------------------------------
