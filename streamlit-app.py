@@ -405,21 +405,45 @@ display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include
 display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
 
 # ----------------------------------------------------
-# 💰🌿 COST & EMISSION DISTRIBUTION SECTION
+# 💰🌿 COST & EMISSION DISTRIBUTION SECTION (FINAL)
 # ----------------------------------------------------
 st.markdown("## 💰 Cost and 🌿 Emission Distribution")
 
 col1, col2 = st.columns(2)
 
-# --- 💰 Cost Distribution ---
+# --- 💰 Cost Distribution (calculated as before) ---
 with col1:
     st.subheader("Cost Distribution")
 
+    # --- Dynamically compute costs from model components ---
+    transport_cost = (
+        closest.get("Transport_L1", 0)
+        + closest.get("Transport_L2", 0)
+        + closest.get("Transport_L2_new", 0)
+        + closest.get("Transport_L3", 0)
+    )
+
+    sourcing_handling_cost = (
+        closest.get("Sourcing_L1", 0)
+        + closest.get("Handling_L2_total", 0)
+        + closest.get("Handling_L3", 0)
+    )
+
+    co2_cost_production = closest.get("CO2_Manufacturing_State1", 0)
+
+    inventory_cost = (
+        closest.get("Inventory_L1", 0)
+        + closest.get("Inventory_L2", 0)
+        + closest.get("Inventory_L2_new", 0)
+        + closest.get("Inventory_L3", 0)
+    )
+
+    # Prepare for plot
     cost_parts = {
-        "Transportation Cost": closest.get("Transportation Cost", 0),
-        "Sourcing/Handling Cost": closest.get("Sourcing/Handling Cost", 0),
-        "CO₂ Cost in Production": closest.get("CO2 Cost in Production", 0),
-        "Inventory Cost": closest.get("Transit Inventory Cost", 0)
+        "Transportation Cost": transport_cost,
+        "Sourcing/Handling Cost": sourcing_handling_cost,
+        "CO₂ Cost in Production": co2_cost_production,
+        "Inventory Cost": inventory_cost
     }
 
     df_cost_dist = pd.DataFrame({
@@ -447,7 +471,7 @@ with col1:
     )
     st.plotly_chart(fig_cost, use_container_width=True)
 
-# --- 🌿 Emission Distribution ---
+# --- 🌿 Emission Distribution (from new recorded columns) ---
 with col2:
     st.subheader("Emission Distribution")
 
@@ -485,7 +509,6 @@ with col2:
             height=400
         )
         st.plotly_chart(fig_emission, use_container_width=True)
-
 
 
 
