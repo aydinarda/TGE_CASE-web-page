@@ -183,52 +183,7 @@ if not filtered.empty:
 else:
     st.warning("No scenarios found for this exact combination to show sensitivity.")
     
-    
-# ----------------------------------------------------
-# 🌿 EMISSION DISTRIBUTION BAR CHART (Updated for new SC2F outputs)
-# ----------------------------------------------------
-st.markdown("## 🌿 Emission Distribution (Tons)")
 
-# Correct emission column names from SC2F.py outputs
-emission_fields = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
-
-# Filter to the columns that actually exist in the loaded dataset
-existing_emission_fields = [col for col in emission_fields if col in df.columns]
-
-if existing_emission_fields:
-    # Build DataFrame for plotting from the currently selected scenario
-    emission_data = pd.DataFrame({
-        "Source": [name.replace("E(", "").replace(")", "") for name in existing_emission_fields],
-        "Emission (tons)": [closest[name] for name in existing_emission_fields]
-    }).sort_values("Emission (tons)", ascending=True)
-
-    import plotly.express as px
-
-    fig_emission = px.bar(
-        emission_data,
-        x="Emission (tons)",
-        y="Source",
-        orientation="h",
-        text="Emission (tons)",
-        color="Source",
-        color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
-        title="Emission Distribution by Source",
-        template="plotly_white"
-    )
-
-    fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-    fig_emission.update_layout(
-        xaxis_title="Emission (tons)",
-        yaxis_title="",
-        showlegend=False,
-        height=400,
-        margin=dict(t=60, l=30, r=30, b=30)
-    )
-
-    st.plotly_chart(fig_emission, use_container_width=True)
-
-else:
-    st.info("ℹ️ Emission data not found in this dataset.")
     
 # ----------------------------------------------------
 # 🌍 GLOBAL SUPPLY CHAIN MAP
