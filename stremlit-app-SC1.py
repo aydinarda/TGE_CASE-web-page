@@ -479,29 +479,32 @@ with colB:
 with colC:
     st.subheader("Emission Distribution")
 
-    # Columns present in Array_xx% sheets
     emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
 
-    # Build emission dictionary safely
-    emission_data = {}
-    for col in emission_cols:
-        if col in df.columns:
-            try:
-                emission_data[col.replace("E(", "").replace(")", "")] = float(closest[col])
-            except Exception:
-                emission_data[col.replace("E(", "").replace(")", "")] = 0.0
-        else:
-            emission_data[col.replace("E(", "").replace(")", "")] = 0.0
-
-    df_emission_dist = pd.DataFrame({
-        "Mode": list(emission_data.keys()),
-        "Emissions": list(emission_data.values())
-    })
-
-    # Ensure nonzero scaling
-    if df_emission_dist["Emissions"].sum() == 0:
-        st.info("No emission data found for this scenario (all zeros or missing).")
+    # Ensure these columns exist in the current sheet
+    available_cols = [c for c in emission_cols if c in subset.columns]
+    if not available_cols:
+        st.warning("No emission columns found in this sheet.")
     else:
+        # Get the row that matches the selected CO₂ percentage
+        # If exact match not found, use closest
+        if co2_col in subset.columns:
+            closest_row = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
+        else:
+            closest_row = closest
+
+        # Build the emission dictionary from that row
+        emission_data = {
+            c.replace("E(", "").replace(")", ""): float(closest_row[c])
+            if c in closest_row.index or c in subset.columns else 0.0
+            for c in emission_cols
+        }
+
+        df_emission_dist = pd.DataFrame({
+            "Mode": list(emission_data.keys()),
+            "Emissions": list(emission_data.values())
+        })
+
         import plotly.express as px
         fig_emission_dist = px.bar(
             df_emission_dist,
@@ -512,6 +515,7 @@ with colC:
             color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
             title="Emission Distribution"
         )
+
         fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
         fig_emission_dist.update_layout(
             template="plotly_white",
@@ -520,6 +524,7 @@ with colC:
             yaxis_title="Tons of CO₂",
             height=400
         )
+
         st.plotly_chart(fig_emission_dist, use_container_width=True)
 
 
