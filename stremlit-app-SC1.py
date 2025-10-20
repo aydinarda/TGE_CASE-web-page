@@ -479,55 +479,54 @@ with colB:
 with colC:
     st.subheader("Emission Distribution")
 
-    emission_cols = ["E_air", "E_sea", "E_road", "E_lastmile", "E_production"]
+    emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
 
-    # Ensure these columns exist in the current sheet
-    available_cols = [c for c in emission_cols if c in subset.columns]
+    # ensure emission columns exist in current Array sheet
+    available_cols = [c for c in emission_cols if c in df.columns]
     if not available_cols:
         st.warning("No emission columns found in this sheet.")
     else:
-        # Get the row that matches the selected CO₂ percentage
-        # If exact match not found, use closest
-        if co2_col in subset.columns:
-            closest_row = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
+        # Find the row that matches selected CO2 %
+        co2_col = next((c for c in df.columns if "reduction" in c.lower()), None)
+        if co2_col is None:
+            st.error("No CO₂ reduction column found.")
         else:
-            closest_row = closest
+            # Find the nearest CO₂ value in current sheet
+            target_row = df.iloc[(df[co2_col] - co2_pct).abs().argmin()]
 
-        # Build the emission dictionary from that row
-        emission_data = {
-            c.replace("E(", "").replace(")", ""): float(closest_row[c])
-            if c in closest_row.index or c in subset.columns else 0.0
-            for c in emission_cols
-        }
+            # Build emission data dictionary
+            emission_data = {}
+            for col in emission_cols:
+                try:
+                    emission_data[col.replace("E(", "").replace(")", "")] = float(target_row[col])
+                except Exception:
+                    emission_data[col.replace("E(", "").replace(")", "")] = 0.0
 
-        df_emission_dist = pd.DataFrame({
-            "Mode": list(emission_data.keys()),
-            "Emissions": list(emission_data.values())
-        })
+            df_emission_dist = pd.DataFrame({
+                "Mode": list(emission_data.keys()),
+                "Emissions": list(emission_data.values())
+            })
 
-        import plotly.express as px
-        fig_emission_dist = px.bar(
-            df_emission_dist,
-            x="Mode",
-            y="Emissions",
-            text="Emissions",
-            color="Mode",
-            color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
-            title="Emission Distribution"
-        )
+            import plotly.express as px
+            fig_emission_dist = px.bar(
+                df_emission_dist,
+                x="Mode",
+                y="Emissions",
+                text="Emissions",
+                color="Mode",
+                color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
+                title="Emission Distribution"
+            )
 
-        fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-        fig_emission_dist.update_layout(
-            template="plotly_white",
-            showlegend=False,
-            xaxis_tickangle=-35,
-            yaxis_title="Tons of CO₂",
-            height=400
-        )
-
-        st.plotly_chart(fig_emission_dist, use_container_width=True)
-
-
+            fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig_emission_dist.update_layout(
+                template="plotly_white",
+                showlegend=False,
+                xaxis_tickangle=-35,
+                yaxis_title="Tons of CO₂",
+                height=400
+            )
+            st.plotly_chart(fig_emission_dist, use_container_width=True)
 
 # ----------------------------------------------------
 # RAW DATA VIEW
