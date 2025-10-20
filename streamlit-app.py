@@ -77,7 +77,7 @@ co2_cost_options = sorted(df["CO2_CostAtMfg"].unique().tolist())
 penalty_options = sorted(df["Unit_penaltycost"].unique().tolist())
 
 co2_cost = st.sidebar.select_slider(
-    "CO₂ Manufacturing Cost (€ per ton)",
+    "CO₂ Price In Europe (€ per ton)",
     options=co2_cost_options,
     value=co2_cost_options[len(co2_cost_options)//2]
 )
