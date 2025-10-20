@@ -481,26 +481,32 @@ with colC:
 
     emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
 
-    # ensure emission columns exist in current Array sheet
+    # Ensure these columns exist in the current sheet
     available_cols = [c for c in emission_cols if c in df.columns]
     if not available_cols:
         st.warning("No emission columns found in this sheet.")
     else:
-        # Find the row that matches selected CO2 %
+        # Clean numeric formats (convert comma decimals, strip non-numeric chars)
+        for c in available_cols:
+            df[c] = (
+                df[c]
+                .astype(str)
+                .str.replace(",", ".", regex=False)
+                .str.replace(r"[^0-9.\-]", "", regex=True)
+            )
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+        # Find nearest row by CO₂ reduction %
         co2_col = next((c for c in df.columns if "reduction" in c.lower()), None)
         if co2_col is None:
             st.error("No CO₂ reduction column found.")
         else:
-            # Find the nearest CO₂ value in current sheet
             target_row = df.iloc[(df[co2_col] - co2_pct).abs().argmin()]
 
-            # Build emission data dictionary
-            emission_data = {}
-            for col in emission_cols:
-                try:
-                    emission_data[col.replace("E(", "").replace(")", "")] = float(target_row[col])
-                except Exception:
-                    emission_data[col.replace("E(", "").replace(")", "")] = 0.0
+            # Collect emission values
+            emission_data = {
+                c.replace("E(", "").replace(")", ""): target_row[c] for c in available_cols
+            }
 
             df_emission_dist = pd.DataFrame({
                 "Mode": list(emission_data.keys()),
@@ -517,7 +523,6 @@ with colC:
                 color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
                 title="Emission Distribution"
             )
-
             fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
             fig_emission_dist.update_layout(
                 template="plotly_white",
