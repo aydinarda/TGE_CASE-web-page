@@ -433,6 +433,114 @@ if get_value_safe("Layer3Sea") + get_value_safe("Layer3Air") + get_value_safe("L
 st.markdown("---")
 
 # ----------------------------------------------------
+# 💰🌿 COST & EMISSION DISTRIBUTION SECTION
+# ----------------------------------------------------
+st.markdown("## 💰 Cost and 🌿 Emission Distribution")
+
+colA, colB, colC = st.columns(3)
+
+# --- 1️⃣ Cost vs CO2 Sensitivity (Bar Chart Version) ---
+with colA:
+    st.subheader("CO₂ Sensitivity (Bar View)")
+    emissions_col = "Total Emissions" if "Total Emissions" in df.columns else "CO2_Total"
+    cost_col = "Total Cost" if "Total Cost" in df.columns else "Objective_value"
+
+    df_sorted = df[[emissions_col, cost_col]].copy().sort_values(by=emissions_col)
+    df_sorted["CO2 Reduction %"] = (
+        df["CO2 Reduction %"] if "CO2 Reduction %" in df.columns else None
+    )
+
+    import plotly.express as px
+    fig_bar = px.bar(
+        df_sorted,
+        x=emissions_col,
+        y=cost_col,
+        text_auto=".2s",
+        color_discrete_sequence=["#4169E1"],
+        title="Cost vs CO₂ Emission Sensitivity (Bar)"
+    )
+    fig_bar.update_layout(
+        template="plotly_white",
+        xaxis_title="Total Emissions (tons)",
+        yaxis_title="Total Cost (€)",
+        height=400
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+# --- 2️⃣ Cost Distribution ---
+with colB:
+    st.subheader("Cost Distribution")
+
+    cost_components = {
+        "Transportation Cost": closest.get("Transportation Cost", 0),
+        "Sourcing/Handling Cost": closest.get("Sourcing/Handling Cost", 0),
+        "CO₂ Cost in Production": closest.get("CO2 Cost in Production", 0),
+        "Inventory Cost": closest.get("Transit Inventory Cost", 0),
+    }
+
+    df_cost_dist = pd.DataFrame({
+        "Category": list(cost_components.keys()),
+        "Value": list(cost_components.values())
+    })
+
+    fig_cost_dist = px.bar(
+        df_cost_dist,
+        x="Category",
+        y="Value",
+        text="Value",
+        color="Category",
+        color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
+        title="Cost Distribution"
+    )
+    fig_cost_dist.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+    fig_cost_dist.update_layout(
+        template="plotly_white",
+        showlegend=False,
+        xaxis_tickangle=-35,
+        yaxis_title="€",
+        height=400
+    )
+    st.plotly_chart(fig_cost_dist, use_container_width=True)
+
+# --- 3️⃣ Emission Distribution ---
+with colC:
+    st.subheader("Emission Distribution")
+
+    emission_components = {
+        "Air": closest.get("E_air", 0),
+        "Sea": closest.get("E_sea", 0),
+        "Road": closest.get("E_road", 0),
+        "Last-mile": closest.get("E_lastmile", 0),
+        "Production": closest.get("E_production", 0),
+    }
+
+    df_emission_dist = pd.DataFrame({
+        "Mode": list(emission_components.keys()),
+        "Emissions": list(emission_components.values())
+    })
+
+    fig_emission_dist = px.bar(
+        df_emission_dist,
+        x="Mode",
+        y="Emissions",
+        text="Emissions",
+        color="Mode",
+        color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
+        title="Emission Distribution"
+    )
+    fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+    fig_emission_dist.update_layout(
+        template="plotly_white",
+        showlegend=False,
+        xaxis_tickangle=-35,
+        yaxis_title="Tons of CO₂",
+        height=400
+    )
+    st.plotly_chart(fig_emission_dist, use_container_width=True)
+
+
+
+# ----------------------------------------------------
 # RAW DATA VIEW
 # ----------------------------------------------------
 with st.expander("📄 Show Full Data Table"):
