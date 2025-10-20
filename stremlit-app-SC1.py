@@ -479,19 +479,23 @@ with colB:
 with colC:
     st.subheader("Emission Distribution")
 
-    emission_components = {
-        "Air": closest.get("E_air", 0),
-        "Sea": closest.get("E_sea", 0),
-        "Road": closest.get("E_road", 0),
-        "Last-mile": closest.get("E_lastmile", 0),
-        "Production": closest.get("E_production", 0),
-    }
+    # Try to use Array_xx% sheet emission columns
+    possible_emission_cols = [
+        "E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"
+    ]
+    emission_data = {}
+    for col_name in possible_emission_cols:
+        if col_name in closest.index:
+            emission_data[col_name.replace("E(", "").replace(")", "")] = float(closest[col_name])
+        else:
+            emission_data[col_name.replace("E(", "").replace(")", "")] = 0.0
 
     df_emission_dist = pd.DataFrame({
-        "Mode": list(emission_components.keys()),
-        "Emissions": list(emission_components.values())
+        "Mode": list(emission_data.keys()),
+        "Emissions": list(emission_data.values())
     })
 
+    import plotly.express as px
     fig_emission_dist = px.bar(
         df_emission_dist,
         x="Mode",
@@ -501,6 +505,7 @@ with colC:
         color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
         title="Emission Distribution"
     )
+
     fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
     fig_emission_dist.update_layout(
         template="plotly_white",
@@ -509,6 +514,7 @@ with colC:
         yaxis_title="Tons of CO₂",
         height=400
     )
+
     st.plotly_chart(fig_emission_dist, use_container_width=True)
 
 
