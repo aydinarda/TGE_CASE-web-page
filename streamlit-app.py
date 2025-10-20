@@ -474,43 +474,53 @@ fig_cost.update_layout(
     margin=dict(t=60, l=30, r=30, b=30)
 )
 
-# ---------- EMISSION DISTRIBUTION ----------
-emission_labels = ["Air", "Sea", "Road", "Last-mile", "Production"]
-emission_values = [
-    closest.get("CO2_Air_tons", 0),
-    closest.get("CO2_Sea_tons", 0),
-    closest.get("CO2_Road_tons", 0),
-    closest.get("CO2_LastMile_tons", 0),
-    closest.get("CO2_Prod_tons", 0)
-]
-emission_colors = ["#AECBFA", "#0077C8", "#999999", "#FFD24C", "#B0B6C4"]
+# ----------------------------------------------------
+# 🌿 EMISSION DISTRIBUTION SECTION (Bottom of Page)
+# ----------------------------------------------------
+st.markdown("## 🌿 Emission Distribution")
 
-fig_emis = go.Figure()
-fig_emis.add_trace(go.Bar(
-    x=emission_labels,
-    y=emission_values,
-    text=[f"{v:,.0f}" for v in emission_values],
-    textposition="outside",
-    marker_color=emission_colors
-))
+# Emission columns as recorded in SC2F simulation
+emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
 
-fig_emis.update_layout(
-    title="Emission Distribution",
-    title_font=dict(size=18, family="Arial Black"),
-    xaxis=dict(title="", tickfont=dict(size=13, family="Arial Black")),
-    yaxis=dict(title="", showgrid=False),
-    template="plotly_white",
-    height=400,
-    margin=dict(t=60, l=30, r=30, b=30)
-)
+# Check which emission columns exist in the dataset
+available_emission_cols = [c for c in emission_cols if c in df.columns]
 
-# ---------- SIDE-BY-SIDE DISPLAY ----------
-col1, col2 = st.columns(2)
-with col1:
-    st.plotly_chart(fig_cost, use_container_width=True)
-with col2:
-    st.plotly_chart(fig_emis, use_container_width=True)
+if not available_emission_cols:
+    st.info("No emission data found for this scenario.")
+else:
+    # Extract emission data for the currently selected scenario
+    emission_data = {
+        c.replace("E(", "").replace(")", ""): float(closest[c])
+        for c in available_emission_cols
+    }
 
+    df_emission = pd.DataFrame({
+        "Source": list(emission_data.keys()),
+        "Emission (tons)": list(emission_data.values())
+    })
+
+    import plotly.express as px
+    fig_emission = px.bar(
+        df_emission,
+        x="Source",
+        y="Emission (tons)",
+        text="Emission (tons)",
+        color="Source",
+        color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
+        title="Emission Distribution by Source",
+        template="plotly_white"
+    )
+
+    fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+    fig_emission.update_layout(
+        showlegend=False,
+        xaxis_tickangle=-35,
+        yaxis_title="Tons of CO₂",
+        height=400,
+        margin=dict(l=30, r=30, t=60, b=60)
+    )
+
+    st.plotly_chart(fig_emission, use_container_width=True)
 
 
 
