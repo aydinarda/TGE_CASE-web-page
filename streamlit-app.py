@@ -405,130 +405,86 @@ display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include
 display_layer_summary("Layer 3: DCs → Retailers (f3)", "f3", include_road=True)
 
 # ----------------------------------------------------
-# 💰 COST & 🌿 EMISSION DISTRIBUTION VISUALS (Corrected)
+# 💰🌿 COST & EMISSION DISTRIBUTION SECTION
 # ----------------------------------------------------
 st.markdown("## 💰 Cost and 🌿 Emission Distribution")
 
-import plotly.graph_objects as go
+col1, col2 = st.columns(2)
 
-# ---------- COST DISTRIBUTION ----------
-cost_labels = [
-    "Transportation Cost",
-    "Sourcing/Handling Cost",
-    "CO₂ Cost in Production",
-    "Inventory Cost"
-]
+# --- 💰 Cost Distribution ---
+with col1:
+    st.subheader("Cost Distribution")
 
-# Compute from closest scenario row
-transport_cost = (
-    closest.get("Transport_L1", 0) +
-    closest.get("Transport_L2", 0) +
-    closest.get("Transport_L3", 0)
-)
-
-# 🧩 Corrected sourcing/handling combination
-sourcing_handling_cost = (
-    closest.get("Sourcing_L1", 0) +
-    closest.get("Handling_L2_total", 0) +
-    closest.get("Handling_L3", 0)
-)
-
-# 🧩 Corrected CO₂ cost in manufacturing
-co2_prod_cost = (
-    closest.get("CO2_Cost_L2_2", 0) +
-    closest.get("CO2_Manufacturing_State1", 0)
-)
-
-# Inventory cost
-inventory_cost = (
-    closest.get("Inventory_L1", 0) +
-    closest.get("Inventory_L2", 0) +
-    closest.get("Inventory_L3", 0)
-)
-
-cost_values = [
-    transport_cost,
-    sourcing_handling_cost,
-    co2_prod_cost,
-    inventory_cost
-]
-
-cost_colors = ["#AECBFA", "#D3D3D3", "#FFD24C", "#6B7A8F"]
-
-fig_cost = go.Figure()
-fig_cost.add_trace(go.Bar(
-    x=cost_labels,
-    y=cost_values,
-    text=[f"{v:,.0f}" for v in cost_values],
-    textposition="outside",
-    marker_color=cost_colors
-))
-
-fig_cost.update_layout(
-    title="Cost Distribution",
-    title_font=dict(size=18, family="Arial Black"),
-    xaxis=dict(title="", tickfont=dict(size=13, family="Arial Black")),
-    yaxis=dict(title="", showgrid=False),
-    template="plotly_white",
-    height=400,
-    margin=dict(t=60, l=30, r=30, b=30)
-)
-
-# ----------------------------------------------------
-# 🌿 EMISSION DISTRIBUTION SECTION (Bottom of Page)
-# ----------------------------------------------------
-st.markdown("## 🌿 Emission Distribution")
-
-# Emission columns as recorded in SC2F simulation
-emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
-
-# Check which emission columns exist in the dataset
-available_emission_cols = [c for c in emission_cols if c in df.columns]
-
-if not available_emission_cols:
-    st.info("No emission data found for this scenario.")
-else:
-    # Extract emission data for the currently selected scenario
-    emission_data = {
-        c.replace("E(", "").replace(")", ""): float(closest[c])
-        for c in available_emission_cols
+    cost_parts = {
+        "Transportation Cost": closest.get("Transportation Cost", 0),
+        "Sourcing/Handling Cost": closest.get("Sourcing/Handling Cost", 0),
+        "CO₂ Cost in Production": closest.get("CO2 Cost in Production", 0),
+        "Inventory Cost": closest.get("Transit Inventory Cost", 0)
     }
 
-    df_emission = pd.DataFrame({
-        "Source": list(emission_data.keys()),
-        "Emission (tons)": list(emission_data.values())
+    df_cost_dist = pd.DataFrame({
+        "Category": list(cost_parts.keys()),
+        "Value": list(cost_parts.values())
     })
 
     import plotly.express as px
-    fig_emission = px.bar(
-        df_emission,
-        x="Source",
-        y="Emission (tons)",
-        text="Emission (tons)",
-        color="Source",
-        color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
-        title="Emission Distribution by Source",
-        template="plotly_white"
+    fig_cost = px.bar(
+        df_cost_dist,
+        x="Category",
+        y="Value",
+        text="Value",
+        color="Category",
+        color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
+        title="Cost Distribution"
     )
-
-    fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-    fig_emission.update_layout(
+    fig_cost.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+    fig_cost.update_layout(
+        template="plotly_white",
         showlegend=False,
         xaxis_tickangle=-35,
-        yaxis_title="Tons of CO₂",
-        height=400,
-        margin=dict(l=30, r=30, t=60, b=60)
+        yaxis_title="€",
+        height=400
     )
-
-    st.plotly_chart(fig_emission, use_container_width=True)
-
-
-# ---------- SIDE-BY-SIDE DISPLAY ----------
-col1, col2 = st.columns(2)
-with col1:
     st.plotly_chart(fig_cost, use_container_width=True)
+
+# --- 🌿 Emission Distribution ---
 with col2:
-    st.plotly_chart(fig_emis, use_container_width=True)
+    st.subheader("Emission Distribution")
+
+    emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
+    available_cols = [c for c in emission_cols if c in df.columns]
+
+    if not available_cols:
+        st.info("No emission data available for this scenario.")
+    else:
+        emission_data = {
+            c.replace("E(", "").replace(")", ""): float(closest[c])
+            for c in available_cols
+        }
+
+        df_emission = pd.DataFrame({
+            "Source": list(emission_data.keys()),
+            "Emission (tons)": list(emission_data.values())
+        })
+
+        fig_emission = px.bar(
+            df_emission,
+            x="Source",
+            y="Emission (tons)",
+            text="Emission (tons)",
+            color="Source",
+            color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
+            title="Emission Distribution"
+        )
+        fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+        fig_emission.update_layout(
+            template="plotly_white",
+            showlegend=False,
+            xaxis_tickangle=-35,
+            yaxis_title="Tons of CO₂",
+            height=400
+        )
+        st.plotly_chart(fig_emission, use_container_width=True)
 
 
 
