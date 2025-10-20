@@ -437,35 +437,8 @@ st.markdown("---")
 # ----------------------------------------------------
 st.markdown("## 💰 Cost and 🌿 Emission Distribution")
 
-colA, colB, colC = st.columns(3)
+colB, colC = st.columns(2)
 
-# --- 1️⃣ Cost vs CO2 Sensitivity (Bar Chart Version) ---
-with colA:
-    st.subheader("CO₂ Sensitivity (Bar View)")
-    emissions_col = "Total Emissions" if "Total Emissions" in df.columns else "CO2_Total"
-    cost_col = "Total Cost" if "Total Cost" in df.columns else "Objective_value"
-
-    df_sorted = df[[emissions_col, cost_col]].copy().sort_values(by=emissions_col)
-    df_sorted["CO2 Reduction %"] = (
-        df["CO2 Reduction %"] if "CO2 Reduction %" in df.columns else None
-    )
-
-    import plotly.express as px
-    fig_bar = px.bar(
-        df_sorted,
-        x=emissions_col,
-        y=cost_col,
-        text_auto=".2s",
-        color_discrete_sequence=["#4169E1"],
-        title="Cost vs CO₂ Emission Sensitivity (Bar)"
-    )
-    fig_bar.update_layout(
-        template="plotly_white",
-        xaxis_title="Total Emissions (tons)",
-        yaxis_title="Total Cost (€)",
-        height=400
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
 
 # --- 2️⃣ Cost Distribution ---
 with colB:
