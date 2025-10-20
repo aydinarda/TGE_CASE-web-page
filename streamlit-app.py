@@ -72,21 +72,25 @@ co2_pct = st.sidebar.slider(
     step=0.01
 )
 
-# ✅ Use only discrete existing options for CO₂ cost and penalty cost
-co2_cost_options = sorted(df["CO2_CostAtMfg"].unique().tolist())
-penalty_options = sorted(df["Unit_penaltycost"].unique().tolist())
+# ✅ Define discrete values consistent with SC2F simulation
+co2_cost_options = [0, 20, 40, 60, 80, 100]   # from SC2F: CO_2_CostsAtEU
+penalty_options = [1.7]                       # single fixed penalty value
 
+# CO₂ cost (select one from 0–100)
 co2_cost = st.sidebar.select_slider(
     "CO₂ Price In Europe (€ per ton)",
     options=co2_cost_options,
-    value=co2_cost_options[len(co2_cost_options)//2]
+    value=60  # default mid-range value
 )
 
-penalty_cost = st.sidebar.select_slider(
+# Penalty cost (only one)
+penalty_cost = st.sidebar.selectbox(
     "Penalty Cost (€/unit)",
     options=penalty_options,
-    value=penalty_options[len(penalty_options)//2]
+    index=0,
+    help="Fixed penalty cost from SC2F configuration"
 )
+
 
 # ----------------------------------------------------
 # FILTER SUBSET AND FIND CLOSEST SCENARIO
@@ -181,30 +185,24 @@ else:
     
     
 # ----------------------------------------------------
-# EMISSION DISTRIBUTION BAR CHART
+# 🌿 EMISSION DISTRIBUTION BAR CHART (Updated for new SC2F outputs)
 # ----------------------------------------------------
 st.markdown("## 🌿 Emission Distribution (Tons)")
 
-# Extract emission components from the selected scenario
-emission_fields = [
-    "CO2_Prod_tons",
-    "CO2_LastMile_tons",
-    "CO2_Road_tons",
-    "CO2_Sea_tons",
-    "CO2_Air_tons"
-]
+# Correct emission column names from SC2F.py outputs
+emission_fields = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
 
-# Filter to columns that exist in df
-existing_emission_fields = [f for f in emission_fields if f in closest.index]
+# Filter to the columns that actually exist in the loaded dataset
+existing_emission_fields = [col for col in emission_fields if col in df.columns]
 
 if existing_emission_fields:
+    # Build DataFrame for plotting from the currently selected scenario
     emission_data = pd.DataFrame({
-        "Source": [
-            name.replace("CO2_", "").replace("_tons", "").replace("_", " ").title()
-            for name in existing_emission_fields
-        ],
-        "Emission (tons)": [closest[f] for f in existing_emission_fields]
+        "Source": [name.replace("E(", "").replace(")", "") for name in existing_emission_fields],
+        "Emission (tons)": [closest[name] for name in existing_emission_fields]
     }).sort_values("Emission (tons)", ascending=True)
+
+    import plotly.express as px
 
     fig_emission = px.bar(
         emission_data,
@@ -212,23 +210,25 @@ if existing_emission_fields:
         y="Source",
         orientation="h",
         text="Emission (tons)",
-        color="Emission (tons)",
-        color_continuous_scale="Greens",
-        title="Emission Distribution (Tons)",
-        template="plotly_white",
+        color="Source",
+        color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
+        title="Emission Distribution by Source",
+        template="plotly_white"
     )
 
-    fig_emission.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+    fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
     fig_emission.update_layout(
         xaxis_title="Emission (tons)",
         yaxis_title="",
-        coloraxis_showscale=False,
+        showlegend=False,
         height=400,
+        margin=dict(t=60, l=30, r=30, b=30)
     )
 
     st.plotly_chart(fig_emission, use_container_width=True)
+
 else:
-    st.info("No emission breakdown columns found in this dataset.")
+    st.info("ℹ️ Emission data not found in this dataset.")
     
 # ----------------------------------------------------
 # 🌍 GLOBAL SUPPLY CHAIN MAP
