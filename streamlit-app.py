@@ -65,7 +65,7 @@ weight_selected = st.sidebar.selectbox(
 )
 
 co2_pct = st.sidebar.slider(
-    "CO₂ Percentage",
+    "CO₂ Reduction",
     float(df["CO2_percentage"].min()),
     float(df["CO2_percentage"].max()),
     float(df["CO2_percentage"].mean()),
