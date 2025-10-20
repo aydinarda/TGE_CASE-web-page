@@ -114,13 +114,30 @@ else:
     st.stop()
 
 # Create slider for CO2 Reduction %
+# Create slider for CO₂ Reduction %
 co2_pct = st.sidebar.slider(
     f"CO₂ Reduction Target ({co2_col})",
-    float(subset[co2_col].min()),
-    float(subset[co2_col].max()),
-    float(subset[co2_col].mean()),
-    step=0.01
+    0.0, 1.0, 0.25, step=0.01,
+    help="Select a CO₂ reduction target between 0–100%. If the scenario was never feasible, you’ll see a message below."
 )
+
+# Find closest feasible scenario (if any)
+if (subset[co2_col] - co2_pct).abs().min() < 1e-6:
+    closest = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
+    feasible = True
+else:
+    feasible = False
+
+# ----------------------------------------------------
+# 🚦 FEASIBILITY CHECK
+# ----------------------------------------------------
+if not feasible:
+    st.error(
+        f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n"
+        "Try adjusting your CO₂ target or demand level."
+    )
+    st.stop()
+
 
 # ----------------------------------------------------
 # FIND CLOSEST SCENARIO
