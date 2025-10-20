@@ -523,6 +523,15 @@ else:
     st.plotly_chart(fig_emission, use_container_width=True)
 
 
+# ---------- SIDE-BY-SIDE DISPLAY ----------
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(fig_cost, use_container_width=True)
+with col2:
+    st.plotly_chart(fig_emis, use_container_width=True)
+
+
+
 
 # ----------------------------------------------------
 # RAW DATA VIEW
