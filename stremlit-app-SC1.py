@@ -216,6 +216,46 @@ fig.add_scatter(
 )
 
 # ----------------------------------------------------
+# 🆕 COST vs EMISSIONS DUAL-AXIS BAR-LINE PLOT
+# ----------------------------------------------------
+st.markdown("## 💶 Cost vs Emissions (Dual-Axis View)")
+
+@st.cache_data(show_spinner=False)
+def generate_cost_emission_chart(df_sheet: pd.DataFrame):
+    # Use only the two key columns (safe fallback for naming)
+    emissions_col = "Total Emissions" if "Total Emissions" in df_sheet.columns else "CO2_Total"
+    cost_col = "Total Cost" if "Total Cost" in df_sheet.columns else "Objective_value"
+
+    df_chart = df_sheet[[emissions_col, cost_col]].copy().sort_values(by=emissions_col)
+    df_chart.reset_index(drop=True, inplace=True)
+    df_chart.index = range(1, len(df_chart) + 1)
+    df_chart["Emissions (k)"] = df_chart[emissions_col] / 1000
+    df_chart["Cost (M)"] = df_chart[cost_col] / 1_000_000
+
+    import matplotlib.pyplot as plt
+
+    fig, ax1 = plt.subplots(figsize=(9, 4))
+    ax1.bar(df_chart.index, df_chart["Emissions (k)"], color="dimgray", alpha=0.9)
+    ax1.set_ylabel("thousand", color="dimgray", fontsize=10)
+    ax1.tick_params(axis="y", labelcolor="dimgray")
+    ax1.set_ylim(0, df_chart["Emissions (k)"].max() * 1.15)
+
+    ax2 = ax1.twinx()
+    ax2.plot(df_chart.index, df_chart["Cost (M)"], color="red", linestyle="dotted", marker="o")
+    ax2.set_ylabel("million", color="red", fontsize=10)
+    ax2.tick_params(axis="y", labelcolor="red")
+    ax2.set_ylim(0, df_chart["Cost (M)"].max() * 1.15)
+
+    ax1.set_title("Cost vs. Emissions", fontsize=14, fontweight="bold", color="firebrick")
+    ax1.set_xlabel("Scenario Index")
+    fig.tight_layout()
+
+    return fig
+
+fig_cost_emission = generate_cost_emission_chart(df)
+st.pyplot(fig_cost_emission)
+
+# ----------------------------------------------------
 # 🌍 SUPPLY CHAIN MAP
 # ----------------------------------------------------
 st.markdown("## 🌍 Global Supply Chain Network")
