@@ -142,18 +142,28 @@ col2.metric(
     "Total CO₂ (tons)",
     f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest.get('CO2_Total', 0):.2f}"
 )
-col3.metric(
-    "Inventory Total (€)",
-    f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}"
-    if all(c in closest for c in ['Inventory_L1','Inventory_L2','Inventory_L3'])
-    else "N/A"
-)
-col4.metric(
-    "Transport Total (€)",
-    f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}"
-    if all(c in closest for c in ['Transport_L1','Transport_L2','Transport_L3'])
-    else "N/A"
-)
+# ---------- totals with smart fallbacks ----------
+# Inventory
+inv_layer_cols = [c for c in ["Inventory_L1", "Inventory_L2", "Inventory_L3"] if c in closest.index]
+if inv_layer_cols:
+    inv_total = float(closest[inv_layer_cols].sum())
+elif "Transit Inventory Cost" in closest.index:
+    inv_total = float(closest["Transit Inventory Cost"])
+else:
+    inv_total = None
+
+# Transport
+tr_layer_cols = [c for c in ["Transport_L1", "Transport_L2", "Transport_L3"] if c in closest.index]
+if tr_layer_cols:
+    tr_total = float(closest[tr_layer_cols].sum())
+elif "Transportation Cost" in closest.index:
+    tr_total = float(closest["Transportation Cost"])
+else:
+    tr_total = None
+
+col3.metric("Inventory Total (€)", f"{inv_total:.2f}" if inv_total is not None else "N/A")
+col4.metric("Transport Total (€)", f"{tr_total:.2f}" if tr_total is not None else "N/A")
+
 
 # ----------------------------------------------------
 # COST vs EMISSION PLOT
@@ -218,7 +228,7 @@ fig.add_scatter(
 # ----------------------------------------------------
 # 🆕 COST vs EMISSIONS DUAL-AXIS BAR-LINE PLOT (DYNAMIC)
 # ----------------------------------------------------
-st.markdown("## 💶 Cost vs Emissions (Dual-Axis View)")
+st.markdown("## 💶 Cost vs Emissions ")
 
 @st.cache_data(show_spinner=False)
 def generate_cost_emission_chart_plotly_dynamic(df_sheet: pd.DataFrame, selected_value: float):
