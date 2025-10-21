@@ -55,15 +55,11 @@ except Exception as e:
     st.stop()
 
 # ----------------------------------------------------
-# SIDEBAR FILTERS
+# SIDEBAR FILTERS (simplified)
 # ----------------------------------------------------
 st.sidebar.header("🎛️ Filter Parameters")
 
-weight_selected = st.sidebar.selectbox(
-    "Select Product Weight (kg)",
-    sorted(df["Product_weight"].unique())
-)
-
+# Remove Product Weight and Penalty Cost
 co2_pct = st.sidebar.slider(
     "CO₂ Reduction",
     float(df["CO2_percentage"].min()),
@@ -72,42 +68,31 @@ co2_pct = st.sidebar.slider(
     step=0.01
 )
 
-# ✅ Define discrete values consistent with SC2F simulation
-co2_cost_options = [0, 20, 40, 60, 80, 100]   # from SC2F: CO_2_CostsAtEU
-penalty_options = [1.7]                       # single fixed penalty value
-
-# CO₂ cost (select one from 0–100)
+co2_cost_options = [0, 20, 40, 60, 80, 100]
 co2_cost = st.sidebar.select_slider(
     "CO₂ Price In Europe (€ per ton)",
     options=co2_cost_options,
-    value=60  # default mid-range value
-)
-
-# Penalty cost (only one)
-penalty_cost = st.sidebar.selectbox(
-    "Penalty Cost (€/unit)",
-    options=penalty_options,
-    index=0,
-    help="Fixed penalty cost from SC2F configuration"
+    value=60
 )
 
 
 # ----------------------------------------------------
 # FILTER SUBSET AND FIND CLOSEST SCENARIO
 # ----------------------------------------------------
-subset = data_by_weight[weight_selected]
-
-# Exact match on CO₂ manufacturing cost and penalty cost
-pool = subset[
-    (subset["CO2_CostAtMfg"] == co2_cost) &
-    (subset["Unit_penaltycost"] == penalty_cost)
-]
+pool = df[df["CO2_CostAtMfg"] == co2_cost]
 
 if pool.empty:
-    st.warning("⚠️ No exact matches found for this combination — showing nearest instead.")
-    pool = subset.copy()
+    st.warning("⚠️ No scenarios match this CO₂ price — showing all instead.")
+    pool = df.copy()
 
 closest = pool.iloc[(pool["CO2_percentage"] - co2_pct).abs().argmin()]
+
+# ----------------------------------------------------
+# CHECK FOR FEASIBILITY (NaN COST)
+# ----------------------------------------------------
+if pd.isna(closest["Objective_value"]):
+    st.error("💥 Oops! The optimizer tried its best, but this one’s **not feasible** — maybe your CO₂ budget was too harsh! 😅")
+    st.stop()
 
 # ----------------------------------------------------
 # KPI VIEW
