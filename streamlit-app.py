@@ -91,8 +91,14 @@ closest = pool.iloc[(pool["CO2_percentage"] - co2_pct).abs().argmin()]
 # CHECK FOR FEASIBILITY (NaN COST)
 # ----------------------------------------------------
 if pd.isna(closest["Objective_value"]):
-    st.error("💥 Oops! The optimizer tried its best, but this one’s **not feasible** — maybe your CO₂ budget was too harsh! 😅")
+    st.error(
+        "💥 *Kaboom!* The optimizer just threw its hands in the air — "
+        "this setup isn’t **feasible**! 😅\n\n"
+        "Try loosening your CO₂ reduction target or lowering the CO₂ price in Europe — "
+        "sometimes the planet needs a little compromise. 🌍💸"
+    )
     st.stop()
+
 
 # ----------------------------------------------------
 # KPI VIEW
