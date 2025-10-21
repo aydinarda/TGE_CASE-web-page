@@ -140,9 +140,8 @@ if not filtered.empty:
         x="CO2_Total",
         y="Selected_Cost",
         color="CO2_percentage",
-        size="Unit_penaltycost",
-        hover_data=["CO2_CostAtMfg", "Product_weight", "Unit_penaltycost", "CO2_percentage"],
-        title=f"{selected_metric_label} vs Total CO₂ (Weight={weight_selected} kg, Penalty={penalty_cost}, MfgCO₂={co2_cost})",
+        hover_data=["CO2_CostAtMfg", "Product_weight", "CO2_percentage"],
+        title=f"{selected_metric_label} vs Total CO₂ (MfgCO₂={co2_cost})",
         labels={"CO2_Total": "Total CO₂ Emissions (tons)", "Selected_Cost": y_label},
         color_continuous_scale="Viridis",
         template="plotly_white"
