@@ -110,45 +110,58 @@ data_by_weight = preprocess(df)
 # ----------------------------------------------------
 st.sidebar.header("🎛️ Filter Parameters")
 
-# Remove Product Weight and Penalty Cost
+# 🎯 Let users freely choose CO₂ reduction (0–100%)
 co2_pct = st.sidebar.slider(
-    "CO₂ Reduction",
-    float(df["CO2_percentage"].min()),
-    float(df["CO2_percentage"].max()),
-    float(df["CO2_percentage"].mean()),
-    step=0.01
+    "CO₂ Reduction Target (%)",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(df["CO2_percentage"].mean()) if "CO2_percentage" in df.columns else 0.5,
+    step=0.01,
+    help="Set the global CO₂ reduction target between 0 (no reduction) and 1 (100% reduction)."
 )
 
 co2_cost_options = [0, 20, 40, 60, 80, 100]
 co2_cost = st.sidebar.select_slider(
-    "CO₂ Price In Europe (€ per ton)",
+    "CO₂ Price in Europe (€ per ton)",
     options=co2_cost_options,
-    value=60
+    value=60,
+    help="Select the carbon price in the EU emissions market."
 )
-
 
 # ----------------------------------------------------
 # FILTER SUBSET AND FIND CLOSEST SCENARIO
 # ----------------------------------------------------
-pool = df[df["CO2_CostAtMfg"] == co2_cost]
+pool = df[df["CO2_CostAtMfg"] == co2_cost] if "CO2_CostAtMfg" in df.columns else df.copy()
 
 if pool.empty:
     st.warning("⚠️ No scenarios match this CO₂ price — showing all instead.")
     pool = df.copy()
 
-closest = pool.iloc[(pool["CO2_percentage"] - co2_pct).abs().argmin()]
+# Find closest feasible scenario to chosen CO₂ reduction
+try:
+    closest_idx = (pool["CO2_percentage"] - co2_pct).abs().argmin()
+    closest = pool.iloc[closest_idx]
+except Exception:
+    st.error("💥 The optimizer fainted — no matching CO₂ targets exist in this dataset! 🌀")
+    st.stop()
 
 # ----------------------------------------------------
-# CHECK FOR FEASIBILITY (NaN COST)
+# CHECK FOR FEASIBILITY / FUNNY MESSAGE
 # ----------------------------------------------------
-if pd.isna(closest["Objective_value"]):
+if pd.isna(closest.get("Objective_value", None)):
     st.error(
         "💥 *Kaboom!* The optimizer just threw its hands in the air — "
         "this setup isn’t **feasible**! 😅\n\n"
-        "Try loosening your CO₂ reduction target or lowering the CO₂ price in Europe — "
+        "Try loosening your CO₂ reduction target or lowering the CO₂ price — "
         "sometimes the planet needs a little compromise. 🌍💸"
     )
     st.stop()
+
+if closest.get("Status", "") not in ["OPTIMAL", 2]:
+    st.warning(
+        "🤖 Hmm... looks like this one didn’t converge to perfection. "
+        "We’ll show you the closest feasible setup anyway. 💪"
+    )
 
 
 # ----------------------------------------------------
