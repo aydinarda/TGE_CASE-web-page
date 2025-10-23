@@ -279,6 +279,78 @@ if not filtered.empty:
 else:
     st.warning("No scenarios found for this exact combination to show sensitivity.")
     
+# ----------------------------------------------------
+# 🏭 PRODUCTION OUTBOUND PIE CHART (f1 + f2_2)
+# ----------------------------------------------------
+st.markdown("## 🏭 Production Outbound Breakdown")
+
+# --- total market demand (fixed reference) ---
+TOTAL_MARKET_DEMAND = 111000  # units
+
+# --- Gather flow variable columns ---
+f1_cols = [c for c in df.columns if c.startswith("f1[")]
+f2_2_cols = [c for c in df.columns if c.startswith("f2_2[")]
+
+# --- Calculate production sums ---
+prod_sources = {}
+
+# Existing plants (f1)
+for plant in ["TW", "SHA"]:
+    prod_sources[plant] = sum(
+        float(closest[c])
+        for c in f1_cols
+        if c.startswith(f"f1[{plant},")
+    )
+
+# New European factories (f2_2)
+new_facilities = ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]
+for fac in new_facilities:
+    prod_sources[fac] = sum(
+        float(closest[c])
+        for c in f2_2_cols
+        if c.startswith(f"f2_2[{fac},")
+    )
+
+# --- Compute totals and unmet demand ---
+total_produced = sum(prod_sources.values())
+unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
+
+# --- Convert to percentages (over full demand) ---
+labels = list(prod_sources.keys()) + ["Unmet Demand"]
+values = [prod_sources[k] for k in prod_sources] + [unmet]
+percentages = [v / TOTAL_MARKET_DEMAND * 100 for v in values]
+
+# --- Build dataframe for display ---
+df_prod = pd.DataFrame({
+    "Source": labels,
+    "Produced (units)": values,
+    "Share (%)": percentages
+})
+
+# --- Create pie chart ---
+fig_prod = px.pie(
+    df_prod,
+    names="Source",
+    values="Produced (units)",
+    hole=0.3,
+    color="Source",
+    color_discrete_sequence=px.colors.qualitative.Set2,
+    title=f"Production Share by Source (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
+)
+fig_prod.update_traces(textinfo="label+percent", textfont_size=13)
+fig_prod.update_layout(
+    showlegend=True,
+    height=400,
+    template="plotly_white",
+    margin=dict(l=20, r=20, t=40, b=20)
+)
+
+# --- Display chart and table ---
+colA, colB = st.columns([2, 1])
+with colA:
+    st.plotly_chart(fig_prod, use_container_width=True)
+with colB:
+    st.dataframe(df_prod.round(2), use_container_width=True)
 
     
 # ----------------------------------------------------
