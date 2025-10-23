@@ -714,7 +714,7 @@ with col2:
     st.subheader("Emission Distribution")
 
     # Expected emission columns
-    emission_cols = ["E_Air", "E_Sea", "E_Road", "E_Lastmile", "E_Production"]
+    emission_cols = ["E_air", "E_sea", "E_road", "E_lastmile", "E_production"]
 
     # Check if all required emission columns exist
     missing_cols = [c for c in emission_cols if c not in df.columns]
@@ -723,19 +723,19 @@ with col2:
 
     # --- Recalculate E_Production using the correct formula ---
     try:
-        if all(col in df.columns for col in ["E_Air", "E_Sea", "E_Road", "E_Lastmile", "CO2_Total"]):
+        if all(col in df.columns for col in ["E_air", "E_sea", "E_road", "E_lastmile", "CO2_Total"]):
             corrected_E_prod = (
                 float(closest["CO2_Total"])
-                - float(closest["E_Air"])
-                - float(closest["E_Sea"])
-                - float(closest["E_Road"])
-                - float(closest["E_Lastmile"])
+                - float(closest["E_air"])
+                - float(closest["E_sea"])
+                - float(closest["E_road"])
+                - float(closest["E_lastmile"])
             )
             emission_data = {
-                "Air": float(closest["E_Air"]),
-                "Sea": float(closest["E_Sea"]),
-                "Road": float(closest["E_Road"]),
-                "Last-mile": float(closest["E_Lastmile"]),
+                "Air": float(closest["E_air"]),
+                "Sea": float(closest["E_sea"]),
+                "Road": float(closest["E_road"]),
+                "Last-mile": float(closest["E_lastmile"]),
                 "Production": corrected_E_prod
             }
         else:
