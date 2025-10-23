@@ -619,7 +619,7 @@ with colB:
 with colC:
     st.subheader("Emission Distribution")
 
-    emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
+    emission_cols = ["E_Air", "E_Sea", "E_Road", "E_Last-mile", "E_Production"]
 
     # Ensure these columns exist in the current sheet
     available_cols = [c for c in emission_cols if c in df.columns]
