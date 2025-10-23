@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Streamlit Dashboard – Sensitivity and Factory Insights
-Author: Arda Aydın (optimized with caching + discrete sliders)
+Author: Arda Aydın 
 """
 
 import streamlit as st
@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 from io import BytesIO
+import openpyxl
 
 # ----------------------------------------------------
 # CONFIGURATION
@@ -20,45 +21,77 @@ st.set_page_config(
 )
 
 st.title("🏭 CO₂ Sensitivity & Factory Opening Dashboard")
+
 # ----------------------------------------------------
-# CACHED DATA LOADERS
+# 🧭 CACHED DATA LOADERS
 # ----------------------------------------------------
-@st.cache_data(show_spinner="📡 Loading Excel from local or GitHub...")
+@st.cache_data(show_spinner="📡 Reading Excel sheets...")
+def get_sheet_names(path: str):
+    """Return all sheet names from a local Excel file."""
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True)
+        return wb.sheetnames
+    except Exception:
+        return []
+
+@st.cache_data(show_spinner="📡 Loading sheet...")
 def load_data_from_excel(path: str, sheet: str):
-    """Load selected demand level sheet."""
+    """Load a specific sheet from a local Excel file."""
     return pd.read_excel(path, sheet_name=sheet)
 
+@st.cache_data(show_spinner="📡 Fetching backup data from GitHub...")
+def load_data_from_github(url: str):
+    """Fallback GitHub loader (for hosted dashboard)."""
+    response = requests.get(url)
+    response.raise_for_status()
+    return pd.read_excel(BytesIO(response.content), sheet_name="Summary")
 
 # ----------------------------------------------------
-# DEMAND LEVEL SELECTOR
+# 📦 DEMAND LEVEL SELECTION
 # ----------------------------------------------------
 st.sidebar.header("📦 Select Demand Level")
 
-# 👇 Available demand sheets in your new file
-demand_levels = ["100%", "95%", "90%", "85%", "80%", "75%"]
+LOCAL_XLSX_PATH = "simulation_results_demand_levelsSC2.xlsx"
+available_sheets = get_sheet_names(LOCAL_XLSX_PATH)
+
+# Auto-detect demand-level sheets (contain % or “Demand”)
+demand_sheets = [s for s in available_sheets if "%" in s or "Demand" in s]
+if not demand_sheets:
+    demand_sheets = available_sheets
+
 selected_demand = st.sidebar.selectbox(
     "Demand Level",
-    demand_levels,
+    demand_sheets if demand_sheets else ["Default"],
     index=0,
-    help="Choose which demand level's scenarios to visualize."
+    help="Choose which demand level's results to visualize."
 )
 
-# 👇 Path to your new Excel output (update if using a hosted version)
-LOCAL_XLSX_PATH = "simulation_results_demand_levelsSC2.xlsx"
+# ----------------------------------------------------
+# LOAD DATA (local first, then fallback to GitHub)
+# ----------------------------------------------------
+GITHUB_XLSX_URL = (
+    "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/"
+    "simulation_results_full.xlsx"
+)
 
 try:
-    df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand)
-    st.success(f"✅ Loaded data for {selected_demand} demand level.")
+    if available_sheets:
+        df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand)
+        st.success(f"✅ Loaded local sheet '{selected_demand}' "
+                   f"from simulation_results_demand_levelsSC2.xlsx")
+    else:
+        df = load_data_from_github(GITHUB_XLSX_URL)
+        st.info("⚙️ Local file not found — loaded default GitHub data instead.")
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
     st.stop()
 
 # ----------------------------------------------------
-# PREPROCESSING (same as before)
+# 🔄 PREPROCESSING (unchanged)
 # ----------------------------------------------------
 @st.cache_data
 def preprocess(df: pd.DataFrame):
-    """Pre-group the dataframe by Product_weight for instant filtering."""
+    """Group the dataframe by Product_weight for faster filtering."""
     if "Product_weight" not in df.columns:
         return {"N/A": df}
     return {w: d for w, d in df.groupby("Product_weight")}
@@ -71,19 +104,6 @@ def compute_pivot(df: pd.DataFrame):
     return df.groupby(["CO2_percentage", "Product_weight"])["f2_2"].mean().unstack()
 
 data_by_weight = preprocess(df)
-
-# ----------------------------------------------------
-# LOAD DATA (from cache)
-# ----------------------------------------------------
-GITHUB_XLSX_URL = "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/simulation_results_full.xlsx"
-
-try:
-    df = load_data_from_github(GITHUB_XLSX_URL)
-    data_by_weight = preprocess(df)
-    st.success("✅ Data successfully loaded and cached from GitHub!")
-except Exception as e:
-    st.error(f"❌ Failed to load data: {e}")
-    st.stop()
 
 # ----------------------------------------------------
 # SIDEBAR FILTERS (simplified)
