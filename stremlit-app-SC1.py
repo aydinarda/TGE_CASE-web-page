@@ -15,7 +15,7 @@ import re
 # CONFIGURATION
 # ----------------------------------------------------
 st.set_page_config(
-    page_title="Simplified CO₂ Supply Chain Dashboard",
+    page_title="Service Speed vs. Emission Reductions",
     layout="wide",
     initial_sidebar_state="expanded"
 )

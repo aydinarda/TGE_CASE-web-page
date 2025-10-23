@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🏭 CO₂ Sensitivity & Factory Opening Dashboard")
+st.title("🏭 Local Sourcing for Resilience and Impact")
 
 # ----------------------------------------------------
 # 🧭 CACHED DATA LOADERS
