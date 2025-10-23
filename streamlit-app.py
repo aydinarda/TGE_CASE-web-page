@@ -390,60 +390,54 @@ for cd in crossdocks:
         if c.startswith(f"f2[{cd},")
     )
 
-# --- Compute totals and unmet demand ---
+# --- Compute total shipped (met demand only) ---
 total_outbound_cd = sum(crossdock_flows.values())
-unmet_cd = max(TOTAL_MARKET_DEMAND - total_outbound_cd, 0)
 
-# --- Prepare data for chart ---
-labels_cd = list(crossdock_flows.keys()) + ["Unmet Demand"]
-values_cd = [crossdock_flows[k] for k in crossdock_flows] + [unmet_cd]
-percentages_cd = [v / TOTAL_MARKET_DEMAND * 100 for v in values_cd]
+# Avoid division by zero
+if total_outbound_cd == 0:
+    st.info("No crossdock activity recorded for this scenario.")
+else:
+    # --- Prepare data for chart ---
+    labels_cd = list(crossdock_flows.keys())
+    values_cd = [crossdock_flows[k] for k in crossdock_flows]
+    percentages_cd = [v / total_outbound_cd * 100 for v in values_cd]
 
-df_crossdock = pd.DataFrame({
-    "Crossdock": labels_cd,
-    "Shipped (units)": values_cd,
-    "Share (%)": percentages_cd
-})
+    df_crossdock = pd.DataFrame({
+        "Crossdock": labels_cd,
+        "Shipped (units)": values_cd,
+        "Share (%)": percentages_cd
+    })
 
-# --- Create pie chart ---
-fig_crossdock = px.pie(
-    df_crossdock,
-    names="Crossdock",
-    values="Shipped (units)",
-    hole=0.3,
-    title=f"Crossdock Outbound Share (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
-)
+    # --- Create pie chart (only crossdocks) ---
+    fig_crossdock = px.pie(
+        df_crossdock,
+        names="Crossdock",
+        values="Shipped (units)",
+        hole=0.3,
+        title=f"Crossdock Outbound Share (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
+    )
 
-# --- Make 'Unmet Demand' grey ---
-color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
-color_map_cd["Unmet Demand"] = "lightgrey"
+    # Assign color map (no grey needed since 'Unmet Demand' is gone)
+    color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
 
-fig_crossdock.update_traces(
-    textinfo="label+percent",
-    textfont_size=13,
-    marker=dict(colors=[color_map_cd.get(s, "#CCCCCC") for s in df_crossdock["Crossdock"]])
-)
-fig_crossdock.update_layout(
-    showlegend=True,
-    height=400,
-    template="plotly_white",
-    margin=dict(l=20, r=20, t=40, b=20)
-)
+    fig_crossdock.update_traces(
+        textinfo="label+percent",
+        textfont_size=13,
+        marker=dict(colors=[color_map_cd.get(s, "#CCCCCC") for s in df_crossdock["Crossdock"]])
+    )
+    fig_crossdock.update_layout(
+        showlegend=True,
+        height=400,
+        template="plotly_white",
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
 
-fig_crossdock.update_traces(textinfo="label+percent", textfont_size=13)
-fig_crossdock.update_layout(
-    showlegend=True,
-    height=400,
-    template="plotly_white",
-    margin=dict(l=20, r=20, t=40, b=20)
-)
-
-# --- Display chart and table ---
-colC, colD = st.columns([2, 1])
-with colC:
-    st.plotly_chart(fig_crossdock, use_container_width=True)
-with colD:
-    st.dataframe(df_crossdock.round(2), use_container_width=True)
+    # --- Display chart and table ---
+    colC, colD = st.columns([2, 1])
+    with colC:
+        st.plotly_chart(fig_crossdock, use_container_width=True)
+    with colD:
+        st.dataframe(df_crossdock.round(2), use_container_width=True)
 
 
     
