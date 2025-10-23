@@ -115,11 +115,22 @@ else:
 
 # Create slider for CO2 Reduction %
 # Create slider for CO₂ Reduction %
-co2_pct = st.sidebar.slider(
+# ----------------------------------------------------
+# CO₂ REDUCTION SLIDER (0–100% visual, internal 0–1)
+# ----------------------------------------------------
+default_val = float(subset[co2_col].mean()) if co2_col in subset.columns else 0.25
+
+co2_pct_display = st.sidebar.slider(
     f"CO₂ Reduction Target ({co2_col})",
-    0.0, 1.0, 0.25, step=0.01,
-    help="Select a CO₂ reduction target between 0–100%. If the scenario was never feasible, you’ll see a message below."
+    min_value=0,
+    max_value=100,
+    value=int(default_val * 100),
+    step=1,
+    help="Select a CO₂ reduction target between 0–100%.",
 )
+
+# Convert displayed percentage back to decimal for internal matching
+co2_pct = co2_pct_display / 100.0
 
 # Find closest feasible scenario (if any)
 if (subset[co2_col] - co2_pct).abs().min() < 1e-6:
