@@ -9,8 +9,8 @@ jobs:
     steps:
       - name: Ping Streamlit app 1 (streamlit-app.py)
         run: |
-          curl -L --silent "https://tgecase-web-page.streamlit.app/" || echo "Ping 1 failed"
+          curl -L --silent "https://tnecase-web-page.streamlit.app/" || echo "Ping 1 failed"
       
       - name: Ping Streamlit app 2 (stremlit-app-SC1.py)
         run: |
-          curl -L --silent "https://tgecase-web-page-sc1.streamlit.app/" || echo "Ping 2 failed"
+          curl -L --silent "https://tnecase-web-page-sc1.streamlit.app/" || echo "Ping 2 failed"
