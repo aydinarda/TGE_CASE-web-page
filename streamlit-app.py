@@ -713,61 +713,74 @@ with col1:
 with col2:
     st.subheader("Emission Distribution")
 
-    # Columns expected from SC2F outputs
-    emission_cols = ["E_air", "E_sea", "E_road", "E_lastmile", "E_production"]
-    # Accept both original lowercase and formatted (E(Air)) style for flexibility
-    available_cols = [c for c in df.columns if c in emission_cols or c.replace("_", " ").title().replace(" ", "") in [x.replace("(", "").replace(")", "") for x in emission_cols]]
+    # Expected emission columns
+    emission_cols = ["E_Air", "E_Sea", "E_Road", "E_Lastmile", "E_Production"]
 
-    # Fallback: detect any column starting with 'E('
-    if not available_cols:
-        available_cols = [c for c in df.columns if c.startswith("E(")]
+    # Check if all required emission columns exist
+    missing_cols = [c for c in emission_cols if c not in df.columns]
+    if missing_cols:
+        st.warning(f"⚠️ Missing columns: {', '.join(missing_cols)}")
 
-    if not available_cols:
-        st.info("No emission data available for this scenario.")
-    else:
-        # Try reading numeric values safely
-        emission_data = {}
-        for c in available_cols:
-            try:
-                value = float(closest[c])
-                # Clean label: handle both "E(Air)" and "E_air"
-                label = c.replace("E(", "").replace(")", "").replace("E_", "").capitalize()
-                emission_data[label] = value
-            except Exception:
-                continue
-
-        if not emission_data:
-            st.info("No valid emission values found in this scenario.")
+    # --- Recalculate E_Production using the correct formula ---
+    try:
+        if all(col in df.columns for col in ["E_Air", "E_Sea", "E_Road", "E_Lastmile", "CO2_Total"]):
+            corrected_E_prod = (
+                float(closest["CO2_Total"])
+                - float(closest["E_Air"])
+                - float(closest["E_Sea"])
+                - float(closest["E_Road"])
+                - float(closest["E_Lastmile"])
+            )
+            emission_data = {
+                "Air": float(closest["E_Air"]),
+                "Sea": float(closest["E_Sea"]),
+                "Road": float(closest["E_Road"]),
+                "Last-mile": float(closest["E_Lastmile"]),
+                "Production": corrected_E_prod
+            }
         else:
-            df_emission = pd.DataFrame({
+            st.info("⚠️ Could not recalculate E_Production — some columns are missing.")
+            emission_data = {}
+    except Exception as e:
+        st.error(f"Error recalculating emissions: {e}")
+        emission_data = {}
+
+    # --- Plot if valid data exist ---
+    if not emission_data:
+        st.info("No valid emission values found in this scenario.")
+    else:
+        df_emission = (
+            pd.DataFrame({
                 "Source": list(emission_data.keys()),
                 "Emission (tons)": list(emission_data.values())
-            }).sort_values("Emission (tons)", ascending=False)
+            })
+            .sort_values("Emission (tons)", ascending=False)
+        )
 
-            # --- Build Plotly chart ---
-            fig_emission = px.bar(
-                df_emission,
-                x="Source",
-                y="Emission (tons)",
-                text="Emission (tons)",
-                color="Source",
-                color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
-                title="Emission Distribution by Source"
-            )
+        # --- Build Plotly chart ---
+        fig_emission = px.bar(
+            df_emission,
+            x="Source",
+            y="Emission (tons)",
+            text="Emission (tons)",
+            color="Source",
+            color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
+            title="Emission Distribution by Source"
+        )
 
-            fig_emission.update_traces(
-                texttemplate="%{text:.2f}",
-                textposition="outside"
-            )
-            fig_emission.update_layout(
-                template="plotly_white",
-                showlegend=False,
-                xaxis_tickangle=-35,
-                yaxis_title="Tons of CO₂",
-                height=400
-            )
-            st.plotly_chart(fig_emission, use_container_width=True)
+        fig_emission.update_traces(
+            texttemplate="%{text:.2f}",
+            textposition="outside"
+        )
+        fig_emission.update_layout(
+            template="plotly_white",
+            showlegend=False,
+            xaxis_tickangle=-35,
+            yaxis_title="Tons of CO₂",
+            height=400
+        )
 
+        st.plotly_chart(fig_emission, use_container_width=True)
 
 
 # ----------------------------------------------------
