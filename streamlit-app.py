@@ -111,14 +111,20 @@ data_by_weight = preprocess(df)
 st.sidebar.header("🎛️ Filter Parameters")
 
 # 🎯 CO₂ reduction slider (0.00–1.00 = 0–100%)
-co2_pct = st.sidebar.slider(
+# 🎯 CO₂ reduction slider (0–100% visual, internal 0–1)
+default_val = float(df["CO2_percentage"].mean()) if "CO2_percentage" in df.columns else 0.5
+
+co2_pct_display = st.sidebar.slider(
     "CO₂ Reduction Target (%)",
-    min_value=0.0,
-    max_value=1.0,
-    value=float(df["CO2_percentage"].mean()) if "CO2_percentage" in df.columns else 0.5,
-    step=0.01,
-    help="Set 0.00 for no reduction, 1.00 for 100% reduction."
+    min_value=0,
+    max_value=100,
+    value=int(default_val * 100),
+    step=1,
+    help="Set a CO₂ reduction target between 0–100 %.",
 )
+
+# Convert displayed percentage back to 0–1 for internal matching
+co2_pct = co2_pct_display / 100.0
 
 # 🎯 Carbon price selector (work with either column name)
 co2_cost_options = [0, 20, 40, 60, 80, 100]
