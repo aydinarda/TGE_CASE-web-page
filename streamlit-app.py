@@ -480,44 +480,64 @@ with col1:
     )
     st.plotly_chart(fig_cost, use_container_width=True)
 
-# --- 🌿 Emission Distribution (from new recorded columns) ---
+# --- 🌿 Emission Distribution (from recorded columns) ---
 with col2:
     st.subheader("Emission Distribution")
 
-    emission_cols = ["E(Air)", "E(Sea)", "E(Road)", "E(Last-mile)", "E(Production)"]
-    available_cols = [c for c in emission_cols if c in df.columns]
+    # Columns expected from SC2F outputs
+    emission_cols = ["E_air", "E_sea", "E_road", "E_lastmile", "E_production"]
+    # Accept both original lowercase and formatted (E(Air)) style for flexibility
+    available_cols = [c for c in df.columns if c in emission_cols or c.replace("_", " ").title().replace(" ", "") in [x.replace("(", "").replace(")", "") for x in emission_cols]]
+
+    # Fallback: detect any column starting with 'E('
+    if not available_cols:
+        available_cols = [c for c in df.columns if c.startswith("E(")]
 
     if not available_cols:
         st.info("No emission data available for this scenario.")
     else:
-        emission_data = {
-            c.replace("E(", "").replace(")", ""): float(closest[c])
-            for c in available_cols
-        }
+        # Try reading numeric values safely
+        emission_data = {}
+        for c in available_cols:
+            try:
+                value = float(closest[c])
+                # Clean label: handle both "E(Air)" and "E_air"
+                label = c.replace("E(", "").replace(")", "").replace("E_", "").capitalize()
+                emission_data[label] = value
+            except Exception:
+                continue
 
-        df_emission = pd.DataFrame({
-            "Source": list(emission_data.keys()),
-            "Emission (tons)": list(emission_data.values())
-        })
+        if not emission_data:
+            st.info("No valid emission values found in this scenario.")
+        else:
+            df_emission = pd.DataFrame({
+                "Source": list(emission_data.keys()),
+                "Emission (tons)": list(emission_data.values())
+            }).sort_values("Emission (tons)", ascending=False)
 
-        fig_emission = px.bar(
-            df_emission,
-            x="Source",
-            y="Emission (tons)",
-            text="Emission (tons)",
-            color="Source",
-            color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
-            title="Emission Distribution"
-        )
-        fig_emission.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-        fig_emission.update_layout(
-            template="plotly_white",
-            showlegend=False,
-            xaxis_tickangle=-35,
-            yaxis_title="Tons of CO₂",
-            height=400
-        )
-        st.plotly_chart(fig_emission, use_container_width=True)
+            # --- Build Plotly chart ---
+            fig_emission = px.bar(
+                df_emission,
+                x="Source",
+                y="Emission (tons)",
+                text="Emission (tons)",
+                color="Source",
+                color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
+                title="Emission Distribution by Source"
+            )
+
+            fig_emission.update_traces(
+                texttemplate="%{text:.2f}",
+                textposition="outside"
+            )
+            fig_emission.update_layout(
+                template="plotly_white",
+                showlegend=False,
+                xaxis_tickangle=-35,
+                yaxis_title="Tons of CO₂",
+                height=400
+            )
+            st.plotly_chart(fig_emission, use_container_width=True)
 
 
 
