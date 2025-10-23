@@ -110,23 +110,54 @@ data_by_weight = preprocess(df)
 # ----------------------------------------------------
 st.sidebar.header("🎛️ Filter Parameters")
 
-# 🎯 Let users freely choose CO₂ reduction (0–100%)
+# 🎯 CO₂ reduction slider (0.00–1.00 = 0–100%)
 co2_pct = st.sidebar.slider(
     "CO₂ Reduction Target (%)",
     min_value=0.0,
     max_value=1.0,
     value=float(df["CO2_percentage"].mean()) if "CO2_percentage" in df.columns else 0.5,
     step=0.01,
-    help="Set the global CO₂ reduction target between 0 (no reduction) and 1 (100% reduction)."
+    help="Set 0.00 for no reduction, 1.00 for 100% reduction."
 )
 
+# 🎯 Carbon price selector (work with either column name)
 co2_cost_options = [0, 20, 40, 60, 80, 100]
 co2_cost = st.sidebar.select_slider(
     "CO₂ Price in Europe (€ per ton)",
     options=co2_cost_options,
     value=60,
-    help="Select the carbon price in the EU emissions market."
+    help="Select the EU carbon price column value."
 )
+
+# Decide which column the dataset uses for EU carbon price
+price_col = None
+if "CO2_CostAtMfg" in df.columns:
+    price_col = "CO2_CostAtMfg"
+elif "CO2_CostAtEU" in df.columns:
+    price_col = "CO2_CostAtEU"
+
+# Apply price filter if we found a price column, otherwise keep all rows
+pool = df.copy() if price_col is None else df[df[price_col] == co2_cost]
+
+if pool.empty:
+    st.error("💥 Kaboom! No scenarios match this CO₂ price in the selected sheet. Try another price or demand level.")
+    st.stop()
+
+# Require an **exact** match for the chosen CO₂ reduction (as requested)
+TOL = 1e-9
+exact = pool[(pool["CO2_percentage"] - co2_pct).abs() < TOL] if "CO2_percentage" in pool.columns else pd.DataFrame()
+
+if exact.empty:
+    # No feasible solution for this exact CO₂ target at this price → show the funny message and stop
+    st.error(
+        "💥 *Kaboom!* No feasible solution exists for this exact CO₂ reduction target "
+        f"(**{co2_pct:.2f}**) at carbon price **{co2_cost} €/t**.\n\n"
+        "Try loosening the CO₂ target or changing the carbon price. 🌍💸"
+    )
+    st.stop()
+
+# Pick the first exact match (you can later add tie-breakers if needed)
+closest = exact.iloc[0]
 
 # ----------------------------------------------------
 # FILTER SUBSET AND FIND CLOSEST SCENARIO
@@ -203,16 +234,32 @@ if isinstance(cost_metric_map[selected_metric_label], list):
 else:
     filtered["Selected_Cost"] = filtered[cost_metric_map[selected_metric_label]]
     y_label = selected_metric_label
-
 if not filtered.empty:
+    # Detect which CO₂ price column exists
+    if "CO2_CostAtMfg" in filtered.columns:
+        price_col = "CO2_CostAtMfg"
+    elif "CO2_CostAtEU" in filtered.columns:
+        price_col = "CO2_CostAtEU"
+    else:
+        price_col = None
+
+    # Build hover columns dynamically
+    hover_cols = ["Product_weight", "CO2_percentage"]
+    if price_col:
+        hover_cols.insert(0, price_col)
+
+    # Create sensitivity scatter plot
     fig_sens = px.scatter(
         filtered,
         x="CO2_Total",
         y="Selected_Cost",
         color="CO2_percentage",
-        hover_data=["CO2_CostAtMfg", "Product_weight", "CO2_percentage"],
-        title=f"{selected_metric_label} vs Total CO₂ (MfgCO₂={co2_cost})",
-        labels={"CO2_Total": "Total CO₂ Emissions (tons)", "Selected_Cost": y_label},
+        hover_data=hover_cols,
+        title=f"{selected_metric_label} vs Total CO₂ ({price_col or 'CO₂ price'} = {co2_cost} €/ton)",
+        labels={
+            "CO2_Total": "Total CO₂ Emissions (tons)",
+            "Selected_Cost": y_label
+        },
         color_continuous_scale="Viridis",
         template="plotly_white"
     )
