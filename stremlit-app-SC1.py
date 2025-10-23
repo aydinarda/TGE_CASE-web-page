@@ -333,6 +333,135 @@ fig_cost_emission = generate_cost_emission_chart_plotly_dynamic(df, closest[co2_
 st.plotly_chart(fig_cost_emission, use_container_width=True)
 
 # ----------------------------------------------------
+# 🏭 PRODUCTION OUTBOUND PIE CHART (f1 only)
+# ----------------------------------------------------
+st.markdown("## 🏭 Production Outbound Breakdown")
+
+TOTAL_MARKET_DEMAND = 111000  # total demand reference
+
+# --- Collect f1 variables ---
+f1_cols = [c for c in df.columns if c.startswith("f1[")]
+
+# --- Aggregate production from each Chinese plant ---
+prod_sources = {}
+for plant in ["TW", "SHA"]:
+    prod_sources[plant] = sum(
+        float(closest[c])
+        for c in f1_cols
+        if c.startswith(f"f1[{plant},")
+    )
+
+# --- Calculate unmet demand ---
+total_produced = sum(prod_sources.values())
+unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
+
+# --- Prepare dataframe ---
+labels = list(prod_sources.keys()) + ["Unmet Demand"]
+values = [prod_sources[k] for k in prod_sources] + [unmet]
+percentages = [v / TOTAL_MARKET_DEMAND * 100 for v in values]
+
+df_prod = pd.DataFrame({
+    "Source": labels,
+    "Produced (units)": values,
+    "Share (%)": percentages
+})
+
+# --- Build pie chart (with grey unmet slice) ---
+fig_prod = px.pie(
+    df_prod,
+    names="Source",
+    values="Produced (units)",
+    hole=0.3,
+    title=f"Production Share by Source (Demand Level: {selected_level}%)",
+)
+color_map_prod = {name: color for name, color in zip(df_prod["Source"], px.colors.qualitative.Set2)}
+color_map_prod["Unmet Demand"] = "lightgrey"
+
+fig_prod.update_traces(
+    textinfo="label+percent",
+    textfont_size=13,
+    marker=dict(colors=[color_map_prod.get(s, "#CCCCCC") for s in df_prod["Source"]])
+)
+fig_prod.update_layout(
+    showlegend=True,
+    height=400,
+    template="plotly_white",
+    margin=dict(l=20, r=20, t=40, b=20)
+)
+
+colA, colB = st.columns([2, 1])
+with colA:
+    st.plotly_chart(fig_prod, use_container_width=True)
+with colB:
+    st.dataframe(df_prod.round(2), use_container_width=True)
+
+
+# ----------------------------------------------------
+# 🚚 CROSSDOCK OUTBOUND PIE CHART (f2 only)
+# ----------------------------------------------------
+st.markdown("## 🚚 Crossdock Outbound Breakdown")
+
+# --- Collect f2 variables (Crossdock → DC) ---
+f2_cols = [c for c in df.columns if c.startswith("f2[")]
+
+# --- Crossdocks in SC1F ---
+crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
+
+crossdock_flows = {}
+for cd in crossdocks:
+    crossdock_flows[cd] = sum(
+        float(closest[c])
+        for c in f2_cols
+        if c.startswith(f"f2[{cd},")
+    )
+
+# --- Compute total handled shipments (no unmet here) ---
+total_outbound_cd = sum(crossdock_flows.values())
+
+if total_outbound_cd == 0:
+    st.info("No crossdock activity recorded for this scenario.")
+else:
+    labels_cd = list(crossdock_flows.keys())
+    values_cd = [crossdock_flows[k] for k in crossdock_flows]
+    percentages_cd = [v / total_outbound_cd * 100 for v in values_cd]
+
+    df_crossdock = pd.DataFrame({
+        "Crossdock": labels_cd,
+        "Shipped (units)": values_cd,
+        "Share (%)": percentages_cd
+    })
+
+    fig_crossdock = px.pie(
+        df_crossdock,
+        names="Crossdock",
+        values="Shipped (units)",
+        hole=0.3,
+        title=f"Crossdock Outbound Share (Demand Level: {selected_level}%)",
+    )
+
+    color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
+
+    fig_crossdock.update_traces(
+        textinfo="label+percent",
+        textfont_size=13,
+        marker=dict(colors=[color_map_cd.get(s, "#CCCCCC") for s in df_crossdock["Crossdock"]])
+    )
+    fig_crossdock.update_layout(
+        showlegend=True,
+        height=400,
+        template="plotly_white",
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+
+    colC, colD = st.columns([2, 1])
+    with colC:
+        st.plotly_chart(fig_crossdock, use_container_width=True)
+    with colD:
+        st.dataframe(df_crossdock.round(2), use_container_width=True)
+
+
+
+# ----------------------------------------------------
 # 🌍 SUPPLY CHAIN MAP
 # ----------------------------------------------------
 st.markdown("## 🌍 Global Supply Chain Network")
