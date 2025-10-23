@@ -20,26 +20,57 @@ st.set_page_config(
 )
 
 st.title("🏭 CO₂ Sensitivity & Factory Opening Dashboard")
-
 # ----------------------------------------------------
 # CACHED DATA LOADERS
 # ----------------------------------------------------
-@st.cache_data(show_spinner="📡 Fetching live data from GitHub...")
-def load_data_from_github(url: str):
-    """Download and read the Excel file from GitHub (cached)."""
-    response = requests.get(url)
-    response.raise_for_status()
-    return pd.read_excel(BytesIO(response.content), sheet_name="Summary")
+@st.cache_data(show_spinner="📡 Loading Excel from local or GitHub...")
+def load_data_from_excel(path: str, sheet: str):
+    """Load selected demand level sheet."""
+    return pd.read_excel(path, sheet_name=sheet)
 
+
+# ----------------------------------------------------
+# DEMAND LEVEL SELECTOR
+# ----------------------------------------------------
+st.sidebar.header("📦 Select Demand Level")
+
+# 👇 Available demand sheets in your new file
+demand_levels = ["100%", "95%", "90%", "85%", "80%", "75%"]
+selected_demand = st.sidebar.selectbox(
+    "Demand Level",
+    demand_levels,
+    index=0,
+    help="Choose which demand level's scenarios to visualize."
+)
+
+# 👇 Path to your new Excel output (update if using a hosted version)
+LOCAL_XLSX_PATH = "simulation_results_demand_levelsSC2.xlsx"
+
+try:
+    df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand)
+    st.success(f"✅ Loaded data for {selected_demand} demand level.")
+except Exception as e:
+    st.error(f"❌ Failed to load data: {e}")
+    st.stop()
+
+# ----------------------------------------------------
+# PREPROCESSING (same as before)
+# ----------------------------------------------------
 @st.cache_data
 def preprocess(df: pd.DataFrame):
     """Pre-group the dataframe by Product_weight for instant filtering."""
+    if "Product_weight" not in df.columns:
+        return {"N/A": df}
     return {w: d for w, d in df.groupby("Product_weight")}
 
 @st.cache_data
 def compute_pivot(df: pd.DataFrame):
     """Compute factory openings pivot once for heatmap."""
+    if "f2_2" not in df.columns:
+        return pd.DataFrame()
     return df.groupby(["CO2_percentage", "Product_weight"])["f2_2"].mean().unstack()
+
+data_by_weight = preprocess(df)
 
 # ----------------------------------------------------
 # LOAD DATA (from cache)
