@@ -701,7 +701,7 @@ with st.expander("📄 Show Full Data Table"):
 st.markdown(
     """
     ---
-    🌐 **Explore the full model with new facilities [here](https://tgecase-web-page-01.streamlit.app/)**
+    🌐 **Explore the full model with new facilities [here](https://tnecase-web-page-01.streamlit.app/)**
     """,
     unsafe_allow_html=True
 )
