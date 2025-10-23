@@ -432,6 +432,7 @@ total_outbound_cd = sum(crossdock_flows.values())
 if total_outbound_cd == 0:
     st.info("No crossdock activity recorded for this scenario.")
 else:
+    # --- Prepare data for chart ---
     labels_cd = list(crossdock_flows.keys())
     values_cd = [crossdock_flows[k] for k in crossdock_flows]
     percentages_cd = [v / total_outbound_cd * 100 for v in values_cd]
@@ -442,6 +443,7 @@ else:
         "Share (%)": percentages_cd
     })
 
+    # --- Create pie chart (only crossdocks) ---
     fig_crossdock = px.pie(
         df_crossdock,
         names="Crossdock",
@@ -450,6 +452,7 @@ else:
         title=f"Crossdock Outbound Share (Demand Level: {selected_level}%)",
     )
 
+    # --- Assign color map ---
     color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
 
     fig_crossdock.update_traces(
@@ -464,11 +467,24 @@ else:
         margin=dict(l=20, r=20, t=40, b=20)
     )
 
-    colC, colD = st.columns([2, 1])
+    # --- Display chart, outbound table, and static CO₂ table side by side ---
+    colC, colD, colE = st.columns([2, 1, 1])
+
     with colC:
         st.plotly_chart(fig_crossdock, use_container_width=True)
+
     with colD:
+        st.markdown("#### 🚚 Crossdock Outbounds")
         st.dataframe(df_crossdock.round(2), use_container_width=True)
+
+    with colE:
+        st.markdown("#### 🌿 CO₂ Factors (kg CO₂/unit)")
+        co2_factors_crossdock = pd.DataFrame({
+            "From mfg": ["TW", "SHA"],
+            "CO₂ kg/unit": [6.3, 9.8],
+        })
+        co2_factors_crossdock["CO₂ kg/unit"] = co2_factors_crossdock["CO₂ kg/unit"].map(lambda v: f"{v:.1f}")
+        st.dataframe(co2_factors_crossdock, use_container_width=True)
 
 
 
