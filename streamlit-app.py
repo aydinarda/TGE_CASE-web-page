@@ -352,6 +352,70 @@ with colA:
 with colB:
     st.dataframe(df_prod.round(2), use_container_width=True)
 
+
+# ----------------------------------------------------
+# 🚚 CROSSDOCK OUTBOUND PIE CHART (f2)
+# ----------------------------------------------------
+st.markdown("## 🚚 Crossdock Outbound Breakdown")
+
+# --- total market demand reference ---
+TOTAL_MARKET_DEMAND = 111000  # units
+
+# --- Gather f2 variables (Crossdock → DC) ---
+f2_cols = [c for c in df.columns if c.startswith("f2[")]
+
+# --- Define crossdocks used in SC2 ---
+crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
+
+crossdock_flows = {}
+for cd in crossdocks:
+    crossdock_flows[cd] = sum(
+        float(closest[c])
+        for c in f2_cols
+        if c.startswith(f"f2[{cd},")
+    )
+
+# --- Compute totals and unmet demand ---
+total_outbound_cd = sum(crossdock_flows.values())
+unmet_cd = max(TOTAL_MARKET_DEMAND - total_outbound_cd, 0)
+
+# --- Prepare data for chart ---
+labels_cd = list(crossdock_flows.keys()) + ["Unmet Demand"]
+values_cd = [crossdock_flows[k] for k in crossdock_flows] + [unmet_cd]
+percentages_cd = [v / TOTAL_MARKET_DEMAND * 100 for v in values_cd]
+
+df_crossdock = pd.DataFrame({
+    "Crossdock": labels_cd,
+    "Shipped (units)": values_cd,
+    "Share (%)": percentages_cd
+})
+
+# --- Create pie chart ---
+fig_crossdock = px.pie(
+    df_crossdock,
+    names="Crossdock",
+    values="Shipped (units)",
+    hole=0.3,
+    color="Crossdock",
+    color_discrete_sequence=px.colors.qualitative.Pastel,
+    title=f"Crossdock Outbound Share (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
+)
+fig_crossdock.update_traces(textinfo="label+percent", textfont_size=13)
+fig_crossdock.update_layout(
+    showlegend=True,
+    height=400,
+    template="plotly_white",
+    margin=dict(l=20, r=20, t=40, b=20)
+)
+
+# --- Display chart and table ---
+colC, colD = st.columns([2, 1])
+with colC:
+    st.plotly_chart(fig_crossdock, use_container_width=True)
+with colD:
+    st.dataframe(df_crossdock.round(2), use_container_width=True)
+
+
     
 # ----------------------------------------------------
 # 🌍 GLOBAL SUPPLY CHAIN MAP
