@@ -288,14 +288,16 @@ else:
 # ----------------------------------------------------
 # 🏭 PRODUCTION OUTBOUND PIE CHART (f1 + f2_2)
 # ----------------------------------------------------
+# --- Display chart, outbound table, and static CO₂ table side by side ---
+
 st.markdown("## 🏭 Production Outbound Breakdown")
 
 # --- total market demand (fixed reference) ---
 TOTAL_MARKET_DEMAND = 111000  # units
 
 # --- Gather flow variable columns ---
-f1_cols = [c for c in df.columns if c.startswith("f1[")]
-f2_2_cols = [c for c in df.columns if c.startswith("f2_2[")]
+f1_cols = [c for c in closest.index if c.startswith("f1[")]
+f2_2_cols = [c for c in closest.index if c.startswith("f2_2[")]
 
 # --- Calculate production sums ---
 prod_sources = {}
@@ -303,18 +305,14 @@ prod_sources = {}
 # Existing plants (f1)
 for plant in ["TW", "SHA"]:
     prod_sources[plant] = sum(
-        float(closest[c])
-        for c in f1_cols
-        if c.startswith(f"f1[{plant},")
+        float(closest[c]) for c in f1_cols if c.startswith(f"f1[{plant},")
     )
 
 # New European factories (f2_2)
 new_facilities = ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]
 for fac in new_facilities:
     prod_sources[fac] = sum(
-        float(closest[c])
-        for c in f2_2_cols
-        if c.startswith(f"f2_2[{fac},")
+        float(closest[c]) for c in f2_2_cols if c.startswith(f"f2_2[{fac},")
     )
 
 # --- Compute totals and unmet demand ---
@@ -358,20 +356,24 @@ fig_prod.update_layout(
     margin=dict(l=20, r=20, t=40, b=20)
 )
 
-fig_prod.update_traces(textinfo="label+percent", textfont_size=13)
-fig_prod.update_layout(
-    showlegend=True,
-    height=400,
-    template="plotly_white",
-    margin=dict(l=20, r=20, t=40, b=20)
-)
+# --- Display chart, outbound table, and static CO₂ table side by side ---
+colA, colB, colC = st.columns([2, 1, 1])
 
-# --- Display chart and table ---
-colA, colB = st.columns([2, 1])
 with colA:
     st.plotly_chart(fig_prod, use_container_width=True)
+
 with colB:
+    st.markdown("#### 📦 Production Outbounds")
     st.dataframe(df_prod.round(2), use_container_width=True)
+
+with colC:
+    st.markdown("#### 🌿 CO₂ Factors (kg/unit)")
+    co2_factors_mfg = pd.DataFrame({
+        "From mfg": ["TW", "SHA"],
+        "CO₂ kg/unit": [6.3, 9.8],
+    })
+    co2_factors_mfg["CO₂ kg/unit"] = co2_factors_mfg["CO₂ kg/unit"].map(lambda v: f"{v:.1f}")
+    st.dataframe(co2_factors_mfg, use_container_width=True)
 
 
 # ----------------------------------------------------
@@ -388,6 +390,7 @@ f2_cols = [c for c in df.columns if c.startswith("f2[")]
 # --- Define crossdocks used in SC2 ---
 crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
 
+# --- Calculate crossdock outbounds ---
 crossdock_flows = {}
 for cd in crossdocks:
     crossdock_flows[cd] = sum(
@@ -399,7 +402,6 @@ for cd in crossdocks:
 # --- Compute total shipped (met demand only) ---
 total_outbound_cd = sum(crossdock_flows.values())
 
-# Avoid division by zero
 if total_outbound_cd == 0:
     st.info("No crossdock activity recorded for this scenario.")
 else:
@@ -423,8 +425,13 @@ else:
         title=f"Crossdock Outbound Share (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
     )
 
-    # Assign color map (no grey needed since 'Unmet Demand' is gone)
-    color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
+    # --- Assign color map ---
+    color_map_cd = {
+        name: color for name, color in zip(
+            df_crossdock["Crossdock"],
+            px.colors.qualitative.Pastel
+        )
+    }
 
     fig_crossdock.update_traces(
         textinfo="label+percent",
@@ -438,12 +445,24 @@ else:
         margin=dict(l=20, r=20, t=40, b=20)
     )
 
-    # --- Display chart and table ---
-    colC, colD = st.columns([2, 1])
+    # --- Display chart, outbound table, and static CO₂ table side by side ---
+    colC, colD, colE = st.columns([2, 1, 1])
+
     with colC:
         st.plotly_chart(fig_crossdock, use_container_width=True)
+
     with colD:
+        st.markdown("#### 🚚 Crossdock Outbounds")
         st.dataframe(df_crossdock.round(2), use_container_width=True)
+
+    with colE:
+        st.markdown("#### 🌿 CO₂ Factors (kg CO₂-eq/unit)")
+        co2_factors_new_fac = pd.DataFrame({
+            "From new location": ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"],
+            "GHG (kg CO₂-eq/unit)": [3.2, 2.8, 4.6, 5.8, 6.2]
+        })
+        co2_factors_new_fac["GHG (kg CO₂-eq/unit)"] = co2_factors_new_fac["GHG (kg CO₂-eq/unit)"].map(lambda v: f"{v:.1f}")
+        st.dataframe(co2_factors_new_fac, use_container_width=True)
 
 
     
