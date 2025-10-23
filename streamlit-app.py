@@ -333,10 +333,25 @@ fig_prod = px.pie(
     names="Source",
     values="Produced (units)",
     hole=0.3,
-    color="Source",
-    color_discrete_sequence=px.colors.qualitative.Set2,
     title=f"Production Share by Source (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
 )
+
+# --- Make 'Unmet Demand' grey ---
+color_map_prod = {name: color for name, color in zip(df_prod["Source"], px.colors.qualitative.Set2)}
+color_map_prod["Unmet Demand"] = "lightgrey"
+
+fig_prod.update_traces(
+    textinfo="label+percent",
+    textfont_size=13,
+    marker=dict(colors=[color_map_prod.get(s, "#CCCCCC") for s in df_prod["Source"]])
+)
+fig_prod.update_layout(
+    showlegend=True,
+    height=400,
+    template="plotly_white",
+    margin=dict(l=20, r=20, t=40, b=20)
+)
+
 fig_prod.update_traces(textinfo="label+percent", textfont_size=13)
 fig_prod.update_layout(
     showlegend=True,
@@ -396,10 +411,25 @@ fig_crossdock = px.pie(
     names="Crossdock",
     values="Shipped (units)",
     hole=0.3,
-    color="Crossdock",
-    color_discrete_sequence=px.colors.qualitative.Pastel,
     title=f"Crossdock Outbound Share (Demand Level: {closest.get('Demand_Level', 'N/A')*100:.0f}%)",
 )
+
+# --- Make 'Unmet Demand' grey ---
+color_map_cd = {name: color for name, color in zip(df_crossdock["Crossdock"], px.colors.qualitative.Pastel)}
+color_map_cd["Unmet Demand"] = "lightgrey"
+
+fig_crossdock.update_traces(
+    textinfo="label+percent",
+    textfont_size=13,
+    marker=dict(colors=[color_map_cd.get(s, "#CCCCCC") for s in df_crossdock["Crossdock"]])
+)
+fig_crossdock.update_layout(
+    showlegend=True,
+    height=400,
+    template="plotly_white",
+    margin=dict(l=20, r=20, t=40, b=20)
+)
+
 fig_crossdock.update_traces(textinfo="label+percent", textfont_size=13)
 fig_crossdock.update_layout(
     showlegend=True,
