@@ -646,8 +646,10 @@ with col1:
         + closest.get("Handling_L3", 0)
     )
 
-    co2_cost_production = closest.get("CO2_Manufacturing_State1", 0)
-
+    co2_cost_production1 = closest.get("CO2_Manufacturing_State1", 0)
+    co2_cost_production2 = closest.get("CO2_Cost_L2_2", 0)
+    co2_cost_production = co2_cost_production1 + co2_cost_production2
+    
     inventory_cost = (
         closest.get("Inventory_L1", 0)
         + closest.get("Inventory_L2", 0)
