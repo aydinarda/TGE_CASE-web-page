@@ -448,69 +448,72 @@ else:
 
     
 # ----------------------------------------------------
-# 🌍 GLOBAL SUPPLY CHAIN MAP (hide inactive nodes)
+# 🌍 GLOBAL SUPPLY CHAIN MAP
 # ----------------------------------------------------
 st.markdown("## 🌍 Global Supply Chain Network")
 
-# --- Helper to sum all outbounds by prefix ---
-def total_outbound(prefix):
-    cols = [c for c in closest.index if c.startswith(prefix + "[")]
-    return sum(float(closest[c]) for c in cols if isinstance(closest[c], (int, float)))
-
 # --- Plants (f1, China region) ---
-plants_data = [
-    {"Type": "Plant", "Name": "TW", "Lat": 31.23, "Lon": 121.47, "Outbound": total_outbound("f1[TW")},
-    {"Type": "Plant", "Name": "SHA", "Lat": 22.32, "Lon": 114.17, "Outbound": total_outbound("f1[SHA")},
-]
-plants = pd.DataFrame([p for p in plants_data if p["Outbound"] > 0])
+plants = pd.DataFrame({
+    "Type": ["Plant", "Plant"],
+    "Lat": [31.23, 22.32],        # Shanghai & Southern China
+    "Lon": [121.47, 114.17]
+})
 
 # --- Cross-docks (f2) ---
-crossdock_data = [
-    {"Type": "Cross-dock", "Name": "ATVIE", "Lat": 48.85, "Lon": 2.35, "Outbound": total_outbound("f2[ATVIE")},
-    {"Type": "Cross-dock", "Name": "PLGDN", "Lat": 50.11, "Lon": 8.68, "Outbound": total_outbound("f2[PLGDN")},
-    {"Type": "Cross-dock", "Name": "FRCDG", "Lat": 37.98, "Lon": 23.73, "Outbound": total_outbound("f2[FRCDG")},
-]
-crossdocks = pd.DataFrame([c for c in crossdock_data if c["Outbound"] > 0])
+crossdocks = pd.DataFrame({
+    "Type": ["Cross-dock"] * 3,
+    "Lat": [48.85, 50.11, 37.98],   # France, Germany, Greece
+    "Lon": [2.35, 8.68, 23.73]
+})
 
-# --- Distribution Centres (f3) ---
-dc_data = [
-    {"Type": "Distribution Centre", "Name": "DEBER", "Lat": 47.50, "Lon": 19.04, "Outbound": total_outbound("f3[DEBER")},
-    {"Type": "Distribution Centre", "Name": "ITMIL", "Lat": 48.14, "Lon": 11.58, "Outbound": total_outbound("f3[ITMIL")},
-    {"Type": "Distribution Centre", "Name": "CHZUR", "Lat": 46.95, "Lon": 7.44, "Outbound": total_outbound("f3[CHZUR")},
-    {"Type": "Distribution Centre", "Name": "PLWAR", "Lat": 45.46, "Lon": 9.19, "Outbound": total_outbound("f3[PLWAR")},
-]
-dcs = pd.DataFrame([d for d in dc_data if d["Outbound"] > 0])
+# --- Distribution Centres (DCs) ---
+dcs = pd.DataFrame({
+    "Type": ["Distribution Centre"] * 4,
+    "Lat": [47.50, 48.14, 46.95, 45.46],   # Central Europe
+    "Lon": [19.04, 11.58, 7.44, 9.19]
+})
 
-# --- Retailer Hubs (always shown) ---
+# --- Retailer Hubs (f3) ---
 retailers = pd.DataFrame({
     "Type": ["Retailer Hub"] * 7,
-    "Name": ["DK", "IE", "UK", "PL", "FR", "ES", "IT"],
-    "Lat": [55.67, 53.35, 51.50, 49.82, 45.76, 43.30, 40.42],
+    "Lat": [55.67, 53.35, 51.50, 49.82, 45.76, 43.30, 40.42],  # North to South
     "Lon": [12.57, -6.26, -0.12, 19.08, 4.83, 5.37, -3.70]
 })
 
-# --- New Production Facilities (f2_2_bin) ---
+# --- New Production Facilities (f2_2) ---
 f2_2_cols = [c for c in closest.index if c.startswith("f2_2_bin")]
+
+# Define coordinates (one per possible facility)
 facility_coords = {
     "f2_2_bin[HUDTG]": (49.61, 6.13),
-    "f2_2_bin[CZMCT]": (44.83, 20.42),
+    "f2_2_bin[CZMCT]":  (44.83, 20.42),
     "f2_2_bin[IEILG]": (47.09, 16.37),
     "f2_2_bin[FIMPF]": (50.45, 14.50),
     "f2_2_bin[PLZCA]": (42.70, 12.65),
 }
+
 active_facilities = []
 for col in f2_2_cols:
     try:
         val = float(closest[col])
         if val > 0.5 and col in facility_coords:
             lat, lon = facility_coords[col]
-            active_facilities.append({"Type": "New Production Facility", "Name": col, "Lat": lat, "Lon": lon})
+            active_facilities.append((col, lat, lon))
     except Exception:
         continue
-new_facilities = pd.DataFrame(active_facilities)
 
-# --- Combine all active locations ---
-locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities], ignore_index=True)
+if active_facilities:
+    new_facilities = pd.DataFrame({
+        "Type": "New Production Facility",
+        "Lat": [lat for _, lat, _ in active_facilities],
+        "Lon": [lon for _, _, lon in active_facilities],
+        "Name": [col for col, _, _ in active_facilities]
+    })
+else:
+    new_facilities = pd.DataFrame(columns=["Type", "Lat", "Lon", "Name"])
+    
+# --- Combine all ---
+locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities])
 
 # --- Define colors & sizes ---
 color_map = {
@@ -520,6 +523,7 @@ color_map = {
     "Retailer Hub": "red",
     "New Production Facility": "deepskyblue"
 }
+
 size_map = {
     "Plant": 15,
     "Cross-dock": 14,
@@ -528,23 +532,23 @@ size_map = {
     "New Production Facility": 14
 }
 
-# --- Create map (only active nodes) ---
+# --- Create Map ---
 fig_map = px.scatter_geo(
     locations,
     lat="Lat",
     lon="Lon",
     color="Type",
     color_discrete_map=color_map,
-    hover_name="Name",
+    hover_name="Type",
     projection="natural earth",
     scope="world",
-    title="Global Supply Chain Structure (Active Only)",
+    title="Global Supply Chain Structure",
     template="plotly_white"
 )
 
-# --- Customize markers ---
+# Customize markers
 for trace in fig_map.data:
-    trace.marker.update(size=size_map.get(trace.name, 12), opacity=0.9, line=dict(width=0.5, color="white"))
+    trace.marker.update(size=size_map[trace.name], opacity=0.9, line=dict(width=0.5, color='white'))
 
 fig_map.update_geos(
     showcountries=True,
@@ -553,7 +557,11 @@ fig_map.update_geos(
     landcolor="rgb(245,245,245)",
     fitbounds="locations"
 )
-fig_map.update_layout(height=550, margin=dict(l=0, r=0, t=40, b=0))
+
+fig_map.update_layout(
+    height=550,
+    margin=dict(l=0, r=0, t=40, b=0)
+)
 
 st.plotly_chart(fig_map, use_container_width=True)
 
@@ -564,8 +572,9 @@ st.markdown("""
 - 🏬 **Distribution Centre**  
 - 🔴 **Retailer Hub**  
 - ⚙️ **New Production Facility**  
-- 🏭 **Plant**
+- 🏭 **Plant** 
 """)
+
 
 # ----------------------------------------------------
 # 🚢✈️🚛 FLOW SUMMARY BY MODE PER LAYER (f1, f2, f2_2, f3)
