@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🏭 Simplified CO₂ Supply Chain Dashboard (SC1F Model)")
+st.title("🏭 Service Speed vs. Emission Reductions")
 
 # ----------------------------------------------------
 # SAFE CACHED DATA LOADER
