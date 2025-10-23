@@ -140,7 +140,7 @@ elif "CO2_CostAtEU" in df.columns:
 pool = df.copy() if price_col is None else df[df[price_col] == co2_cost]
 
 if pool.empty:
-    st.error("💥 Kaboom! No scenarios match this CO₂ price in the selected sheet. Try another price or demand level.")
+    st.error("This solution is not feasible — even Swiss precision couldn’t optimize it! 🇨🇭")
     st.stop()
 
 # Require an **exact** match for the chosen CO₂ reduction (as requested)
@@ -150,9 +150,7 @@ exact = pool[(pool["CO2_percentage"] - co2_pct).abs() < TOL] if "CO2_percentage"
 if exact.empty:
     # No feasible solution for this exact CO₂ target at this price → show the funny message and stop
     st.error(
-        "💥 *Kaboom!* No feasible solution exists for this exact CO₂ reduction target "
-        f"(**{co2_pct:.2f}**) at carbon price **{co2_cost} €/t**.\n\n"
-        "Try loosening the CO₂ target or changing the carbon price. 🌍💸"
+        "This solution is not feasible — even Swiss precision couldn’t optimize it! 🇨🇭"
     )
     st.stop()
 
@@ -181,10 +179,7 @@ except Exception:
 # ----------------------------------------------------
 if pd.isna(closest.get("Objective_value", None)):
     st.error(
-        "💥 *Kaboom!* The optimizer just threw its hands in the air — "
-        "this setup isn’t **feasible**! 😅\n\n"
-        "Try loosening your CO₂ reduction target or lowering the CO₂ price — "
-        "sometimes the planet needs a little compromise. 🌍💸"
+        "This solution is not feasible — even Swiss precision couldn’t optimize it! 🇨🇭"
     )
     st.stop()
 
