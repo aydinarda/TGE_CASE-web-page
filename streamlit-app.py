@@ -47,9 +47,9 @@ def load_data_from_github(url: str):
     return pd.read_excel(BytesIO(response.content), sheet_name="Summary")
 
 # ----------------------------------------------------
-# 📦 DEMAND LEVEL SELECTION
+# 📦 DEMAND FULFILLMENT RATE SELECTION
 # ----------------------------------------------------
-st.sidebar.header("📦 Select Demand Level")
+st.sidebar.header("📦 Demand Fulfillment Rate (%)")
 
 LOCAL_XLSX_PATH = "simulation_results_demand_levelsSC2.xlsx"
 available_sheets = get_sheet_names(LOCAL_XLSX_PATH)
@@ -60,10 +60,10 @@ if not demand_sheets:
     demand_sheets = available_sheets
 
 selected_demand = st.sidebar.selectbox(
-    "Demand Level",
+    "Demand Fulfillment Rate (%)",
     demand_sheets if demand_sheets else ["Default"],
     index=0,
-    help="Choose which demand level's results to visualize."
+    help="Select which demand fulfillment rate's results to visualize."
 )
 
 # ----------------------------------------------------

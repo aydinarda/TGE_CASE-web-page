@@ -63,7 +63,7 @@ levels = sorted(
 
 # Slider to pick demand level
 selected_level = st.sidebar.slider(
-    "Select Demand Level (%)",
+    "Demand Fulfillment Rate (%)",
     min_value=min(levels),
     max_value=max(levels),
     step=5,
