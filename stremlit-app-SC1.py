@@ -47,7 +47,7 @@ def format_number(value):
         return value
 
 try:
-    excel_data = load_excel_from_github(GITHUB_XLSX_URL).round(2)
+    excel_data = load_excel_from_github(GITHUB_XLSX_URL)
     sheet_names = [s for s in excel_data.keys() if s.startswith("Array_")]
     if not sheet_names:
         st.error("❌ No sheets starting with 'Array_' found.")
@@ -81,7 +81,7 @@ selected_sheet = f"Array_{selected_level}%"
 st.sidebar.write(f"📄 Using sheet: `{selected_sheet}`")
 
 # Load selected sheet
-df = excel_data[selected_sheet]
+df = excel_data[selected_sheet].round(2)
 
 df_display = df.applymap(format_number)
 
