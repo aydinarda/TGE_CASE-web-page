@@ -40,14 +40,14 @@ GITHUB_XLSX_URL = (
 )
 
 def format_number(value):
-    """Format numbers with thousand separators and max 2 decimals."""
-    if isinstance(value, (int, float)):
-        return f"{value:,.2f}"
-    return value
-
+    """Format numbers with thousand separators and max two decimals."""
+    try:
+        return f"{float(value):,.2f}"
+    except (ValueError, TypeError):
+        return value
 
 try:
-    excel_data = load_excel_from_github(GITHUB_XLSX_URL)
+    excel_data = load_excel_from_github(GITHUB_XLSX_URL).round(2)
     sheet_names = [s for s in excel_data.keys() if s.startswith("Array_")]
     if not sheet_names:
         st.error("❌ No sheets starting with 'Array_' found.")

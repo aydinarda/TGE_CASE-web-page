@@ -49,10 +49,11 @@ def load_data_from_github(url: str):
 
 
 def format_number(value):
-    """Format numbers with thousand separators and max 2 decimals."""
-    if isinstance(value, (int, float)):
-        return f"{value:,.2f}"
-    return value
+    """Format numbers with thousand separators and max two decimals."""
+    try:
+        return f"{float(value):,.2f}"
+    except (ValueError, TypeError):
+        return value
 
 
 # ----------------------------------------------------
@@ -85,10 +86,10 @@ GITHUB_XLSX_URL = (
 
 try:
     if available_sheets:
-        df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand)
+        df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand).round(2)
 
     else:
-        df = load_data_from_github(GITHUB_XLSX_URL)
+        df = load_data_from_github(GITHUB_XLSX_URL).round(2)
         st.info("⚙️ Local file not found — loaded default GitHub data instead.")
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
@@ -222,7 +223,7 @@ closest_df = closest.to_frame().T  # transpose for row→column view
 cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f")]
 
 # Display cleaned table
-st.write(closest_df[cols_to_show])
+st.write(closest_df[cols_to_show].applymap(format_number))
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")
