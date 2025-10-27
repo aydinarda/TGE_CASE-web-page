@@ -95,7 +95,6 @@ except Exception as e:
     st.stop()
     
 df_display = df.applymap(format_number)
-st.dataframe(df_display)
 
 
 # ----------------------------------------------------

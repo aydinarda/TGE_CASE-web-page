@@ -84,7 +84,6 @@ st.sidebar.write(f"📄 Using sheet: `{selected_sheet}`")
 df = excel_data[selected_sheet]
 
 df_display = df.applymap(format_number)
-st.dataframe(df_display)
 
 
 # ----------------------------------------------------
