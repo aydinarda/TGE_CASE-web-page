@@ -391,8 +391,8 @@ with colB:
 with colC:
     st.markdown("#### 🌿 CO₂ Factors (kg/unit)")
     co2_factors_mfg = pd.DataFrame({
-        "From mfg": ["TW", "SHA"],
-        "CO₂ kg/unit": [6.3, 9.8],
+        "From mfg": ["TW", "SHA", "HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"],
+        "CO₂ kg/unit": [6.3, 9.8, 3.2, 2.8, 4.6, 5.8, 6.2 ],
     })
     co2_factors_mfg["CO₂ kg/unit"] = co2_factors_mfg["CO₂ kg/unit"].map(lambda v: f"{v:.1f}")
     st.dataframe(co2_factors_mfg, use_container_width=True)
@@ -476,15 +476,6 @@ else:
     with colD:
         st.markdown("#### 🚚 Crossdock Outbounds")
         st.dataframe(df_crossdock.round(2), use_container_width=True)
-
-    with colE:
-        st.markdown("#### 🌿 CO₂ Factors (kg CO₂-eq/unit)")
-        co2_factors_new_fac = pd.DataFrame({
-            "From new location": ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"],
-            "GHG (kg CO₂-eq/unit)": [3.2, 2.8, 4.6, 5.8, 6.2]
-        })
-        co2_factors_new_fac["GHG (kg CO₂-eq/unit)"] = co2_factors_new_fac["GHG (kg CO₂-eq/unit)"].map(lambda v: f"{v:.1f}")
-        st.dataframe(co2_factors_new_fac, use_container_width=True)
 
 
     
