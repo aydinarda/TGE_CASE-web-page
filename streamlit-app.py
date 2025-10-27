@@ -732,6 +732,7 @@ with col1:
     st.plotly_chart(fig_cost, use_container_width=True)
 
 # --- 🌿 Emission Distribution (from recorded columns) ---
+# --- 🌿 Emission Distribution (from recorded columns) ---
 with col2:
     st.subheader("Emission Distribution")
 
@@ -767,7 +768,7 @@ with col2:
                 "Air": float(closest["E_air"]),
                 "Sea": float(closest["E_sea"]),
                 "Road": float(closest["E_road"]),
-                "Total Transport": total_transport
+                "Total Transport": total_transport,
             }
 
         else:
@@ -781,13 +782,10 @@ with col2:
     if not emission_data:
         st.info("No valid emission values found in this scenario.")
     else:
-        df_emission = (
-            pd.DataFrame({
-                "Source": list(emission_data.keys()),
-                "Emission (tons)": list(emission_data.values())
-            })
-            .sort_values("Emission (tons)", ascending=False)
-        )
+        df_emission = pd.DataFrame({
+            "Source": list(emission_data.keys()),
+            "Emission (tons)": list(emission_data.values())
+        })
 
         # --- Build Plotly chart ---
         import plotly.express as px
@@ -798,21 +796,27 @@ with col2:
             text="Emission (tons)",
             color="Source",
             color_discrete_sequence=[
-                "#1C7C54", "#17A2B8", "#808080", "#FFD700", "#4682B4", "#000000"
-            ],
-            title="Emission Distribution by Source (Total Transport = Air + Sea + Road)"
+                "#4B8A08", "#2E8B57", "#808080", "#FFD700", "#90EE90", "#000000"
+            ]
         )
 
         fig_emission.update_traces(
             texttemplate="%{text:.2f}",
-            textposition="outside"
+            textposition="outside",
+            marker_line_color="black",
+            marker_line_width=0.5
         )
+
         fig_emission.update_layout(
             template="plotly_white",
             showlegend=False,
             xaxis_tickangle=-35,
             yaxis_title="Tons of CO₂",
-            height=400
+            height=400,
+            title=dict(
+                text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
+                x=0.5
+            )
         )
 
         st.plotly_chart(fig_emission, use_container_width=True)
