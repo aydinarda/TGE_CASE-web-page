@@ -711,8 +711,7 @@ with col1:
         y="Value",
         text="Value",
         color="Category",
-        color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
-        title="Cost Distribution"
+        color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"]
     )
 
     # ✅ Add commas for thousands separators
@@ -813,11 +812,8 @@ with col2:
             xaxis_tickangle=-35,
             yaxis_title="Tons of CO₂",
             height=400,
-            yaxis_tickformat=",",  # comma separators on y-axis
-            title=dict(
-                text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
-                x=0.5
-            )
+            yaxis_tickformat=","  # comma separators on y-axis
+            
         )
 
         st.plotly_chart(fig_emission, use_container_width=True)

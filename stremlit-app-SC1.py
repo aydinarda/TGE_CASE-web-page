@@ -730,11 +730,8 @@ with colC:
                 xaxis_tickangle=-35,
                 yaxis_title="Tons of CO₂",
                 height=400,
-                yaxis_tickformat=",",  # comma separators on axis ticks
-                title=dict(
-                    text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
-                    x=0.5
-                )
+                yaxis_tickformat=","  # comma separators on axis ticks
+                
             )
 
             st.plotly_chart(fig_emission_dist, use_container_width=True)
