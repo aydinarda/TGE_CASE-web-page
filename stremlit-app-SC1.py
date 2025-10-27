@@ -130,16 +130,19 @@ else:
 # ----------------------------------------------------
 default_val = float(subset[co2_col].mean()) if co2_col in subset.columns else 0.25
 
+# ✅ Always start from 0% CO₂ reduction
+default_val = 0.0  # (fractional form, 0.0 = 0%)
+
 co2_pct_display = st.sidebar.slider(
-    f"CO₂ Reduction Target ({co2_col})",
+    "CO₂ Reduction Target (%)",
     min_value=0,
     max_value=100,
-    value=int(default_val * 100),
+    value=int(default_val * 100),  # ✅ default = 0%
     step=1,
-    help="Select a CO₂ reduction target between 0–100%.",
+    help="Set a CO₂ reduction target between 0–100 %.",
 )
 
-# Convert displayed percentage back to decimal for internal matching
+# Convert displayed percentage back to 0–1 for internal matching
 co2_pct = co2_pct_display / 100.0
 
 # Find closest feasible scenario (if any)
