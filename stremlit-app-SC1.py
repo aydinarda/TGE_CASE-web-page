@@ -580,7 +580,7 @@ def get_value_safe(col):
     return float(closest[col]) if col in closest.index else 0.0
 
 # --- Layer 1: Plants → Cross-docks ---
-st.markdown("### Layer 1: Plants → Cross-docks (f1)")
+st.markdown("### Layer 1: Plants → Cross-docks")
 col1, col2 = st.columns(2)
 col1.metric("🚢 Sea", f"{get_value_safe('Layer1Sea'):,.0f} units")
 col2.metric("✈️ Air", f"{get_value_safe('Layer1Air'):,.0f} units")
@@ -589,7 +589,7 @@ if get_value_safe("Layer1Sea") + get_value_safe("Layer1Air") == 0:
 st.markdown("---")
 
 # --- Layer 2: Cross-docks → DCs ---
-st.markdown("### Layer 2: Cross-docks → DCs (f2)")
+st.markdown("### Layer 2: Cross-docks → DCs")
 col1, col2, col3 = st.columns(3)
 col1.metric("🚢 Sea", f"{get_value_safe('Layer2Sea'):,.0f} units")
 col2.metric("✈️ Air", f"{get_value_safe('Layer2Air'):,.0f} units")
@@ -599,7 +599,7 @@ if get_value_safe("Layer2Sea") + get_value_safe("Layer2Air") + get_value_safe("L
 st.markdown("---")
 
 # --- Layer 3: DCs → Retailers ---
-st.markdown("### Layer 3: DCs → Retailer Hubs (f3)")
+st.markdown("### Layer 3: DCs → Retailer Hubs")
 col1, col2, col3 = st.columns(3)
 col1.metric("🚢 Sea", f"{get_value_safe('Layer3Sea'):,.0f} units")
 col2.metric("✈️ Air", f"{get_value_safe('Layer3Air'):,.0f} units")

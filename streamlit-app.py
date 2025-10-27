@@ -648,10 +648,10 @@ def display_layer_summary(title, prefix, include_road=True):
 
 
 # Layer summaries
-display_layer_summary("Layer 1: Plants → Cross-docks (f1)", "f1", include_road=False)
-display_layer_summary("Layer 2a: Cross-docks → DCs (f2)", "f2", include_road=True)
-display_layer_summary("Layer 2b: New Facilities → DCs (f2_2)", "f2_2", include_road=True)
-display_layer_summary("Layer 3: DCs → Retailer Hubs (f3)", "f3", include_road=True)
+display_layer_summary("Layer 1: Plants → Cross-docks", "f1", include_road=False)
+display_layer_summary("Layer 2a: Cross-docks → DCs", "f2", include_road=True)
+display_layer_summary("Layer 2b: New Facilities → DCs", "f2_2", include_road=True)
+display_layer_summary("Layer 3: DCs → Retailer Hubs", "f3", include_road=True)
 
 # ----------------------------------------------------
 # 💰🌿 COST & EMISSION DISTRIBUTION SECTION (FINAL)
