@@ -182,14 +182,16 @@ cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f")]
 st.write(closest_df[cols_to_show])
 
 col1, col2, col3, col4 = st.columns(4)
+
 col1.metric(
     "Total Cost (€)",
-    f"{closest['Total Cost'] if 'Total Cost' in closest else closest.get('Objective_value', 0):.2f}"
+    f"{(closest['Total Cost'] if 'Total Cost' in closest else closest.get('Objective_value', 0)):,.2f}"
 )
 col2.metric(
     "Total CO₂ (tons)",
-    f"{closest['Total Emissions'] if 'Total Emissions' in closest else closest.get('CO2_Total', 0):.2f}"
+    f"{(closest['Total Emissions'] if 'Total Emissions' in closest else closest.get('CO2_Total', 0)):,.2f}"
 )
+
 # ---------- totals with smart fallbacks ----------
 # Inventory
 inv_layer_cols = [c for c in ["Inventory_L1", "Inventory_L2", "Inventory_L3"] if c in closest.index]
@@ -209,8 +211,8 @@ elif "Transportation Cost" in closest.index:
 else:
     tr_total = None
 
-col3.metric("Inventory Total (€)", f"{inv_total:.2f}" if inv_total is not None else "N/A")
-col4.metric("Transport Total (€)", f"{tr_total:.2f}" if tr_total is not None else "N/A")
+col3.metric("Inventory Total (€)", f"{inv_total:,.2f}" if inv_total is not None else "N/A")
+col4.metric("Transport Total (€)", f"{tr_total:,.2f}" if tr_total is not None else "N/A")
 
 # ----------------------------------------------------
 # COST vs EMISSION PLOT

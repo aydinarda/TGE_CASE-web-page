@@ -226,10 +226,11 @@ cols_to_show = [c for c in closest_df.columns if not (c.lower().startswith("f") 
 st.write(closest_df[cols_to_show].applymap(format_number))
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")
-col2.metric("Total CO₂", f"{closest['CO2_Total']:.2f}")
-col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():.2f}")
-col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():.2f}")
+
+col1.metric("Total Cost (€)", f"{closest['Objective_value']:,.2f}")
+col2.metric("Total CO₂", f"{closest['CO2_Total']:,.2f}")
+col3.metric("Inventory Total (€)", f"{closest[['Inventory_L1','Inventory_L2','Inventory_L3']].sum():,.2f}")
+col4.metric("Transport Total (€)", f"{closest[['Transport_L1','Transport_L2','Transport_L3']].sum():,.2f}")
 
 # ----------------------------------------------------
 # COST vs EMISSION SENSITIVITY PLOT
