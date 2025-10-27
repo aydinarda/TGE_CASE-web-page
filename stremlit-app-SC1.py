@@ -599,7 +599,7 @@ if get_value_safe("Layer2Sea") + get_value_safe("Layer2Air") + get_value_safe("L
 st.markdown("---")
 
 # --- Layer 3: DCs → Retailers ---
-st.markdown("### Layer 3: DCs → Retailers (f3)")
+st.markdown("### Layer 3: DCs → Retailer Hubs (f3)")
 col1, col2, col3 = st.columns(3)
 col1.metric("🚢 Sea", f"{get_value_safe('Layer3Sea'):,.0f} units")
 col2.metric("✈️ Air", f"{get_value_safe('Layer3Air'):,.0f} units")
