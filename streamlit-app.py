@@ -714,17 +714,24 @@ with col1:
         color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
         title="Cost Distribution"
     )
-    fig_cost.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+
+    # ✅ Add commas for thousands separators
+    fig_cost.update_traces(
+        texttemplate="%{text:,.0f}",  # commas + 0 decimals
+        textposition="outside"
+    )
     fig_cost.update_layout(
         template="plotly_white",
         showlegend=False,
         xaxis_tickangle=-35,
         yaxis_title="€",
-        height=400
+        height=400,
+        yaxis_tickformat=","  # add commas to axis
     )
+
     st.plotly_chart(fig_cost, use_container_width=True)
 
-# --- 🌿 Emission Distribution (from recorded columns) ---
+
 # --- 🌿 Emission Distribution (from recorded columns) ---
 with col2:
     st.subheader("Emission Distribution")
@@ -781,7 +788,6 @@ with col2:
         })
 
         # --- Build Plotly chart ---
-        import plotly.express as px
         fig_emission = px.bar(
             df_emission,
             x="Source",
@@ -793,8 +799,9 @@ with col2:
             ]
         )
 
+        # ✅ Add commas and keep 2 decimals
         fig_emission.update_traces(
-            texttemplate="%{text:.2f}",
+            texttemplate="%{text:,.2f}",
             textposition="outside",
             marker_line_color="black",
             marker_line_width=0.5
@@ -806,6 +813,7 @@ with col2:
             xaxis_tickangle=-35,
             yaxis_title="Tons of CO₂",
             height=400,
+            yaxis_tickformat=",",  # comma separators on y-axis
             title=dict(
                 text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
                 x=0.5
