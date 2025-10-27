@@ -220,7 +220,7 @@ st.subheader("📊 Closest Scenario Details")
 closest_df = closest.to_frame().T  # transpose for row→column view
 
 # Remove columns starting with 'f'
-cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f")]
+cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f") or c.lower().startswith("Scenario_ID")]
 
 # Display cleaned table
 st.write(closest_df[cols_to_show].applymap(format_number))
