@@ -86,8 +86,7 @@ GITHUB_XLSX_URL = (
 try:
     if available_sheets:
         df = load_data_from_excel(LOCAL_XLSX_PATH, sheet=selected_demand)
-        st.success(f"✅ Loaded local sheet '{selected_demand}' "
-                   f"from simulation_results_demand_levelsSC2.xlsx")
+
     else:
         df = load_data_from_github(GITHUB_XLSX_URL)
         st.info("⚙️ Local file not found — loaded default GitHub data instead.")
@@ -213,7 +212,9 @@ if closest.get("Status", "") not in ["OPTIMAL", 2]:
 # KPI VIEW
 # ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
-st.write(closest.to_frame().T)
+# Hide any column starting with 'f' (case-insensitive)
+cols_to_show = [c for c in closest.columns if not c.lower().startswith("f")]
+st.write(closest.to_frame()[cols_to_show].T)
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")

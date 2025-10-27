@@ -39,13 +39,20 @@ GITHUB_XLSX_URL = (
     "simulation_results_demand_levels.xlsx"
 )
 
+def format_number(value):
+    """Format numbers with thousand separators and max 2 decimals."""
+    if isinstance(value, (int, float)):
+        return f"{value:,.2f}"
+    return value
+
+
 try:
     excel_data = load_excel_from_github(GITHUB_XLSX_URL)
     sheet_names = [s for s in excel_data.keys() if s.startswith("Array_")]
     if not sheet_names:
         st.error("❌ No sheets starting with 'Array_' found.")
         st.stop()
-    st.success(f"✅ Loaded {len(sheet_names)} demand-level sheets.")
+
 except Exception as e:
     st.error(f"❌ Failed to load Excel file: {e}")
     st.stop()
@@ -75,6 +82,10 @@ st.sidebar.write(f"📄 Using sheet: `{selected_sheet}`")
 
 # Load selected sheet
 df = excel_data[selected_sheet]
+
+df_display = df.applymap(format_number)
+st.dataframe(df_display)
+
 
 # ----------------------------------------------------
 # OPTIONAL FILTERS
@@ -159,7 +170,10 @@ closest = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
 # KPI SUMMARY
 # ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
-st.write(closest.to_frame().T)
+
+cols_to_show = [c for c in closest.columns if not c.lower().startswith("f")]
+st.write(closest.to_frame()[cols_to_show].T)
+
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
