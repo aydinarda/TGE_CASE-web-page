@@ -46,6 +46,15 @@ def load_data_from_github(url: str):
     response.raise_for_status()
     return pd.read_excel(BytesIO(response.content), sheet_name="Summary")
 
+
+
+def format_number(value):
+    """Format numbers with thousand separators and max 2 decimals."""
+    if isinstance(value, (int, float)):
+        return f"{value:,.2f}"
+    return value
+
+
 # ----------------------------------------------------
 # 📦 DEMAND FULFILLMENT RATE SELECTION
 # ----------------------------------------------------
@@ -85,6 +94,10 @@ try:
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
     st.stop()
+    
+df_display = df.applymap(format_number)
+st.dataframe(df_display)
+
 
 # ----------------------------------------------------
 # 🔄 PREPROCESSING (unchanged)
