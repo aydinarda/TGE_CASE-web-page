@@ -171,9 +171,13 @@ closest = subset.iloc[(subset[co2_col] - co2_pct).abs().argmin()]
 # ----------------------------------------------------
 st.subheader("📊 Closest Scenario Details")
 
-cols_to_show = [c for c in closest.columns if not c.lower().startswith("f")]
-st.write(closest.to_frame()[cols_to_show].T)
+closest_df = closest.to_frame().T  # transpose for row→column view
 
+# Remove columns starting with 'f'
+cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f")]
+
+# Display cleaned table
+st.write(closest_df[cols_to_show].T)
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
