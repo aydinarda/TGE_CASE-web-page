@@ -617,7 +617,6 @@ st.markdown("## 💰 Cost and 🌿 Emission Distribution")
 
 colB, colC = st.columns(2)
 
-
 # --- 2️⃣ Cost Distribution ---
 with colB:
     st.subheader("Cost Distribution")
@@ -634,6 +633,7 @@ with colB:
         "Value": list(cost_components.values())
     })
 
+    import plotly.express as px
     fig_cost_dist = px.bar(
         df_cost_dist,
         x="Category",
@@ -642,15 +642,23 @@ with colB:
         color="Category",
         color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
     )
-    fig_cost_dist.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+
+    # ✅ Format with thousand separators
+    fig_cost_dist.update_traces(
+        texttemplate="%{text:,.0f}",  # commas, no decimals
+        textposition="outside"
+    )
     fig_cost_dist.update_layout(
         template="plotly_white",
         showlegend=False,
         xaxis_tickangle=-35,
         yaxis_title="€",
-        height=400
+        height=400,
+        yaxis_tickformat=","  # comma separators on y-axis
     )
+
     st.plotly_chart(fig_cost_dist, use_container_width=True)
+
 
 # --- 3️⃣ Emission Distribution ---
 with colC:
@@ -700,7 +708,6 @@ with colC:
                 "Emissions": list(emission_data.values())
             })
 
-            import plotly.express as px
             fig_emission_dist = px.bar(
                 df_emission_dist,
                 x="Source",
@@ -712,8 +719,9 @@ with colC:
                 ]
             )
 
+            # ✅ Add thousand separators
             fig_emission_dist.update_traces(
-                texttemplate="%{text:.2f}",
+                texttemplate="%{text:,.2f}",  # commas + 2 decimals
                 textposition="outside"
             )
             fig_emission_dist.update_layout(
@@ -722,11 +730,13 @@ with colC:
                 xaxis_tickangle=-35,
                 yaxis_title="Tons of CO₂",
                 height=400,
+                yaxis_tickformat=",",  # comma separators on axis ticks
                 title=dict(
                     text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
                     x=0.5
                 )
             )
+
             st.plotly_chart(fig_emission_dist, use_container_width=True)
 
 # ----------------------------------------------------
