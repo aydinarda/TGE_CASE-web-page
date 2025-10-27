@@ -219,7 +219,7 @@ closest_df = closest.to_frame().T  # transpose for row→column view
 cols_to_show = [c for c in closest_df.columns if not c.lower().startswith("f")]
 
 # Display cleaned table
-st.write(closest_df[cols_to_show].T)
+st.write(closest_df[cols_to_show])
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Cost (€)", f"{closest['Objective_value']:.2f}")
