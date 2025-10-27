@@ -639,7 +639,6 @@ with colB:
         text="Value",
         color="Category",
         color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"],
-        title="Cost Distribution"
     )
     fig_cost_dist.update_traces(texttemplate="%{text:.0f}", textposition="outside")
     fig_cost_dist.update_layout(
@@ -681,31 +680,50 @@ with colC:
 
             # Collect emission values
             emission_data = {
-                c.replace("E(", "").replace(")", ""): target_row[c] for c in available_cols
+                "Production": target_row.get("E_Production", 0),
+                "Last-mile": target_row.get("E_Last-mile", 0),
+                "Air": target_row.get("E_Air", 0),
+                "Sea": target_row.get("E_Sea", 0),
+                "Road": target_row.get("E_Road", 0),
             }
 
+            # ✅ Add Total Transport (sum of Air + Sea + Road)
+            emission_data["Total Transport"] = (
+                emission_data["Air"] + emission_data["Sea"] + emission_data["Road"]
+            )
+
+            # Build dataframe for chart
             df_emission_dist = pd.DataFrame({
-                "Mode": list(emission_data.keys()),
+                "Source": list(emission_data.keys()),
                 "Emissions": list(emission_data.values())
             })
 
             import plotly.express as px
             fig_emission_dist = px.bar(
                 df_emission_dist,
-                x="Mode",
+                x="Source",
                 y="Emissions",
                 text="Emissions",
-                color="Mode",
-                color_discrete_sequence=["#4B8A08", "#2E8B57", "#228B22", "#90EE90", "#1C7C54"],
-                title="Emission Distribution"
+                color="Source",
+                color_discrete_sequence=[
+                    "#1C7C54", "#17A2B8", "#808080", "#FFD700", "#4682B4", "#000000"
+                ]
             )
-            fig_emission_dist.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+
+            fig_emission_dist.update_traces(
+                texttemplate="%{text:.2f}",
+                textposition="outside"
+            )
             fig_emission_dist.update_layout(
                 template="plotly_white",
                 showlegend=False,
                 xaxis_tickangle=-35,
                 yaxis_title="Tons of CO₂",
-                height=400
+                height=400,
+                title=dict(
+                    text="Emission Distribution by Source (Total Transport = Air + Sea + Road)",
+                    x=0.5
+                )
             )
             st.plotly_chart(fig_emission_dist, use_container_width=True)
 

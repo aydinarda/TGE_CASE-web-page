@@ -753,13 +753,23 @@ with col2:
                 - float(closest["E_road"])
                 - float(closest["E_lastmile"])
             )
+
+            # ✅ Include Total Transport (sum of Air + Sea + Road)
+            total_transport = (
+                float(closest["E_air"])
+                + float(closest["E_sea"])
+                + float(closest["E_road"])
+            )
+
             emission_data = {
+                "Production": corrected_E_prod,
+                "Last-mile": float(closest["E_lastmile"]),
                 "Air": float(closest["E_air"]),
                 "Sea": float(closest["E_sea"]),
                 "Road": float(closest["E_road"]),
-                "Last-mile": float(closest["E_lastmile"]),
-                "Production": corrected_E_prod
+                "Total Transport": total_transport
             }
+
         else:
             st.info("⚠️ Could not recalculate E_Production — some columns are missing.")
             emission_data = {}
@@ -780,14 +790,17 @@ with col2:
         )
 
         # --- Build Plotly chart ---
+        import plotly.express as px
         fig_emission = px.bar(
             df_emission,
             x="Source",
             y="Emission (tons)",
             text="Emission (tons)",
             color="Source",
-            color_discrete_sequence=["#0077C8", "#00A6A6", "#999999", "#FFD24C", "#6B7A8F"],
-            title="Emission Distribution by Source"
+            color_discrete_sequence=[
+                "#1C7C54", "#17A2B8", "#808080", "#FFD700", "#4682B4", "#000000"
+            ],
+            title="Emission Distribution by Source (Total Transport = Air + Sea + Road)"
         )
 
         fig_emission.update_traces(
@@ -803,6 +816,7 @@ with col2:
         )
 
         st.plotly_chart(fig_emission, use_container_width=True)
+
 
 
 # ----------------------------------------------------
