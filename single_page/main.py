@@ -7,6 +7,11 @@ Created on Tue Nov  4 08:50:39 2025
 
 # main_app.py
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+import requests
+from io import BytesIO
+import re
 from sc1_app import run_sc1
 from sc2_app import run_sc2
 
