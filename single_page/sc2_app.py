@@ -12,14 +12,14 @@ from io import BytesIO
 import openpyxl
 
 def run_sc2():
-    # ----------------------------------------------------
-    # CONFIGURATION
-    # ----------------------------------------------------
-    st.set_page_config(
-        page_title="Optimization Sensitivity Dashboard",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # # ----------------------------------------------------
+    # # CONFIGURATION
+    # # ----------------------------------------------------
+    # st.set_page_config(
+    #     page_title="Optimization Sensitivity Dashboard",
+    #     layout="wide",
+    #     initial_sidebar_state="expanded"
+    # )
     
     st.title("🏭 Local Sourcing for Resilience and Impact")
     

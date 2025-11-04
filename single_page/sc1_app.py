@@ -12,14 +12,14 @@ from io import BytesIO
 import re
 
 def run_sc1():
-    # ----------------------------------------------------
-    # CONFIGURATION
-    # ----------------------------------------------------
-    st.set_page_config(
-        page_title="Service Speed vs. Emission Reductions",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # # ----------------------------------------------------
+    # # CONFIGURATION
+    # # ----------------------------------------------------
+    # st.set_page_config(
+    #     page_title="Service Speed vs. Emission Reductions",
+    #     layout="wide",
+    #     initial_sidebar_state="expanded"
+    # )
     
     st.title("🏭 Service Speed vs. Emission Reductions")
     
