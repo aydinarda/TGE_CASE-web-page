@@ -36,7 +36,7 @@ def run_sc1():
     
     # 👉 Replace with your GitHub-hosted file URL when public
     GITHUB_XLSX_URL = (
-        "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/"
+        "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/single_page/"
         "simulation_results_demand_levels.xlsx"
     )
     

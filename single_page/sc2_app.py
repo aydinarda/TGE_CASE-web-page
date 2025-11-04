@@ -81,7 +81,7 @@ def run_sc2():
     # LOAD DATA (local first, then fallback to GitHub)
     # ----------------------------------------------------
     GITHUB_XLSX_URL = (
-        "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/"
+        "https://raw.githubusercontent.com/aydınarda/TGE_CASE-web-page/main/single_page/"
         "simulation_results_full.xlsx"
     )
     
