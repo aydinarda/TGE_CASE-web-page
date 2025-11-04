@@ -11,7 +11,7 @@ import requests
 from io import BytesIO
 import re
 
-def run_SC1():
+def run_sc1():
     # ----------------------------------------------------
     # CONFIGURATION
     # ----------------------------------------------------

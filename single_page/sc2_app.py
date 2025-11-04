@@ -11,7 +11,7 @@ import requests
 from io import BytesIO
 import openpyxl
 
-def sc2_run():
+def run_sc2():
     # ----------------------------------------------------
     # CONFIGURATION
     # ----------------------------------------------------
