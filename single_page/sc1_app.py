@@ -11,6 +11,26 @@ import requests
 from io import BytesIO
 import re
 
+# ----------------------------------------------------
+# 🌐 CACHED DATA LOADERS 
+# ----------------------------------------------------
+@st.cache_data(show_spinner="📡 Fetching data from GitHub...")
+def load_excel_from_github(url: str):
+    """Load all Excel sheets into a dict of DataFrames (pickle-safe)."""
+    response = requests.get(url)
+    response.raise_for_status()
+    excel_data = pd.read_excel(BytesIO(response.content), sheet_name=None)
+    return excel_data  # dictionary of {sheet_name: DataFrame}
+
+
+def format_number(value):
+    """Format numbers with thousand separators and max two decimals."""
+    try:
+        return f"{float(value):,.2f}"
+    except (ValueError, TypeError):
+        return value
+
+
 def run_sc1():
     # # ----------------------------------------------------
     # # CONFIGURATION
@@ -23,16 +43,7 @@ def run_sc1():
     
     st.title("🏭 Service Speed vs. Emission Reductions")
     
-    # ----------------------------------------------------
-    # SAFE CACHED DATA LOADER
-    # ----------------------------------------------------
-    @st.cache_data(show_spinner="📡 Fetching data from GitHub...")
-    def load_excel_from_github(url: str):
-        """Load all Excel sheets into a dict of DataFrames (pickle-safe)."""
-        response = requests.get(url)
-        response.raise_for_status()
-        excel_data = pd.read_excel(BytesIO(response.content), sheet_name=None)
-        return excel_data  # dictionary of {sheet_name: DataFrame}
+    
     
     # 👉 Replace with your GitHub-hosted file URL when public
     GITHUB_XLSX_URL = (
@@ -40,13 +51,7 @@ def run_sc1():
         "simulation_results_demand_levels.xlsx"
     )
     
-    def format_number(value):
-        """Format numbers with thousand separators and max two decimals."""
-        try:
-            return f"{float(value):,.2f}"
-        except (ValueError, TypeError):
-            return value
-    
+
     try:
         excel_data = load_excel_from_github(GITHUB_XLSX_URL)
         sheet_names = [s for s in excel_data.keys() if s.startswith("Array_")]
@@ -743,13 +748,4 @@ def run_sc1():
     with st.expander("📄 Show Full Data Table"):
         st.dataframe(df.head(500), use_container_width=True)
 
-# ----------------------------------------------------
-# 🌐 FOOTER LINK
-# ----------------------------------------------------
-st.markdown(
-    """
-    ---
-    🌐 **Explore the full model with new facilities [here](https://tnecase-web-page-01.streamlit.app/)**
-    """,
-    unsafe_allow_html=True
-)
+
