@@ -1,4 +1,10 @@
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+import requests
+from io import BytesIO
+import re
+
 from sc1_app import run_sc1
 from sc2_app import run_sc2
 

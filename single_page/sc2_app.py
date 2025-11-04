@@ -705,7 +705,6 @@ def run_sc2():
             "Value": list(cost_parts.values())
         })
     
-        import plotly.express as px
         fig_cost = px.bar(
             df_cost_dist,
             x="Category",
