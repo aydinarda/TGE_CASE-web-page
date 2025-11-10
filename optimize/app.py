@@ -107,4 +107,4 @@ if st.button("Run Optimization"):
         except gp.GurobiError as ge:
             st.error(f"Gurobi Error {ge.errno}: {ge.message}")
         except Exception as e:
-            st.error(f"❌ Optimization failed: {e}")
+            st.error(f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n {e}")
