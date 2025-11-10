@@ -24,8 +24,8 @@ def run_scenario(
     co2_prod_kg_per_unit=None,
     product_weight=2.58,
     co2_cost_per_ton=37.50,
-    co2_cost_per_ton_New=63.58,
-    CO2_base=1733.38261611967,
+    co2_cost_per_ton_New=60.00,
+    CO2_base=1582.42366689614,
     new_loc_capacity=None,
     new_loc_openingCost=None,
     new_loc_operationCost=None,
@@ -36,8 +36,9 @@ def run_scenario(
     lastmile_CO2_kg= 2.68,
     CO_2_max=None,
     CO_2_percentage=0.5,
-    unit_penaltycost = 1,
-    print_results = "YES"
+    unit_penaltycost = 1.7,
+    print_results = "YES",
+    unit_inventory_holdingCost=0.85
 ):
     # =====================================================
     # DEFAULT DATA (filled from original SC2)
@@ -65,14 +66,14 @@ def run_scenario(
     
     if new_loc_capacity is None:
         new_loc_capacity = {
-            "HUDTG": 25000, "CZMCT": 45500, "IEILG": 46000,
-            "FIMPF": 28000, "PLZCA": 16500
+            "HUDTG": 37000, "CZMCT": 45500, "IEILG": 46000,
+            "FIMPF": 35000, "PLZCA": 16500
         }
     
     if new_loc_openingCost is None:
         new_loc_openingCost = {
-            "HUDTG": 5e6, "CZMCT": 9.1e6, "IEILG": 9.2e6,
-            "FIMPF": 5.6e6, "PLZCA": 3.3e6
+            "HUDTG": 7.4e6, "CZMCT": 9.1e6, "IEILG": 9.2e6,
+            "FIMPF": 7e6, "PLZCA": 3.3e6
         }
     
     if new_loc_operationCost is None:
@@ -83,18 +84,18 @@ def run_scenario(
     
     if new_loc_CO2 is None:
         new_loc_CO2 = {
-            "HUDTG": 4.8, "CZMCT": 3.2, "IEILG": 5.4,
-            "FIMPF": 5.8, "PLZCA": 6.5
+            "HUDTG": 3.2, "CZMCT": 2.8, "IEILG": 4.6,
+            "FIMPF": 5.8, "PLZCA": 6.2
         }
     
     if co2_emission_factor is None:
         co2_emission_factor = {"air": 0.000971, "sea": 0.000027, "road": 0.000076}
     
-    service_level = {'air': 0.98, 'sea': 0.6, 'road': 0.85}
+    service_level = {'air': 0.9, 'sea': 0.9, 'road': 0.9}
     average_distance = 9600
-    speed = {'air': 400, 'sea': 20, 'road': 100}
-    std_demand = 38.483144114695
-    
+    speed = {'air': 800, 'sea': 10, 'road': 40}
+    std_demand = np.std(list(demand.values()))
+
     if data is None:
         data = {
             "transportation": ["air", "sea", "road"],
@@ -102,10 +103,7 @@ def run_scenario(
         }
     
     # h (€/unit)
-    data["h (€/unit)"] = [
-        unit_penaltycost * (1 - α) / α
-        for α in service_level.values()
-    ]
+    data["h (€/unit)"] = [0.85, 0.85, 0.85]
     
     # LT (days)
     data["LT (days)"] = [
@@ -120,10 +118,7 @@ def run_scenario(
     data["Density φ(Φ^-1(α))"] = phi_values
     
     # SS (€/unit) = √(LT + 1) * σ * (p + h) * φ(z)
-    data["SS (€/unit)"] = [
-        np.round(np.sqrt(LT + 1) * std_demand * (unit_penaltycost + h) * phi, 13)
-        for LT, h, phi in zip(data["LT (days)"], data["h (€/unit)"], phi_values)
-    ]    
+    data["SS (€/unit)"] = [2109.25627631292, 12055.4037653689, 5711.89299799521]    
     
     
     Modes = ["air", "sea", "road"]
@@ -148,6 +143,9 @@ def run_scenario(
     
     new_loc_unitCost = {loc: (1 / cap) * 100000 for loc, cap in new_loc_capacity.items()}
     
+    print(df)
+    print(df["LT (days)"])
+    print(df["SS (€/unit)"])
 
     # -----------------------------
     # DISTANCES (in km)
@@ -200,6 +198,7 @@ def run_scenario(
                        lb=0, name="f2")  # Crossdock → DC
 
 
+
     f3 = model.addVars(((d, r, mo) for d in Dcs for r in Retailers for mo in Modes),
                        lb=0, name="f3")  # DC → Retailer
     
@@ -218,7 +217,6 @@ def run_scenario(
         for c in Crossdocks for d in Dcs for mo in Modes
     )
     
-
     CO2_tr_L3 = quicksum(
         co2_emission_factor[mo] * dist3.loc[d, r] * product_weight_ton * f3[d, r, mo]
         for d in Dcs for r in Retailers for mo in Modes
@@ -230,13 +228,41 @@ def run_scenario(
         for p in Plants
     ) / 1000.0   # kg -> tons
 
-    
     LastMile_CO2 = (lastmile_CO2_kg/1000)* quicksum(
         f3[d, r, mo] for d in Dcs for r in Retailers for mo in Modes
     )
     
     # Total = production (L1 + L2_2) + transport (L1 + L2 + L3)
     Total_CO2 = CO2_prod_L1 + CO2_tr_L1 + CO2_tr_L2 + CO2_tr_L3 + LastMile_CO2 
+    
+    #Emission to get
+    # ---------- CO2 breakdown by transport mode ----------
+    # L1 (only air & sea)
+    CO2_tr_L1_air = quicksum(
+        co2_emission_factor["air"] * dist1.loc[p, c] * product_weight_ton * f1[p, c, "air"]
+        for p in Plants for c in Crossdocks
+    )
+    CO2_tr_L1_sea = quicksum(
+        co2_emission_factor["sea"] * dist1.loc[p, c] * product_weight_ton * f1[p, c, "sea"]
+        for p in Plants for c in Crossdocks
+    )
+    
+    # L2
+    CO2_tr_L2_air  = quicksum(co2_emission_factor["air"]  * dist2.loc[c, d] * product_weight_ton * f2[c, d, "air"]
+                              for c in Crossdocks for d in Dcs)
+    CO2_tr_L2_sea  = quicksum(co2_emission_factor["sea"]  * dist2.loc[c, d] * product_weight_ton * f2[c, d, "sea"]
+                              for c in Crossdocks for d in Dcs)
+    CO2_tr_L2_road = quicksum(co2_emission_factor["road"] * dist2.loc[c, d] * product_weight_ton * f2[c, d, "road"]
+                              for c in Crossdocks for d in Dcs)
+    
+    # L3
+    CO2_tr_L3_air  = quicksum(co2_emission_factor["air"]  * dist3.loc[d, r] * product_weight_ton * f3[d, r, "air"]
+                              for d in Dcs for r in Retailers)
+    CO2_tr_L3_sea  = quicksum(co2_emission_factor["sea"]  * dist3.loc[d, r] * product_weight_ton * f3[d, r, "sea"]
+                              for d in Dcs for r in Retailers)
+    CO2_tr_L3_road = quicksum(co2_emission_factor["road"] * dist3.loc[d, r] * product_weight_ton * f3[d, r, "road"]
+                              for d in Dcs for r in Retailers)
+
     
     # -----------------------------
     # COST CALCULATIONS
@@ -264,7 +290,6 @@ def run_scenario(
 
     Total_Transport_L2 = quicksum(Transport_L2[mo] for mo in Modes)
 
-
     Transport_L3 = {}
 
     for mo in Modes:
@@ -277,47 +302,62 @@ def run_scenario(
 
     Total_Transport = Total_Transport_L1 + Total_Transport_L2 + Total_Transport_L3
 
-    ################### INVENTORY COST #############################
-
-    #Layer 1
-
+    # ================= INVENTORY COST DEFINITIONS =================
+    # Layer 1
     InvCost_L1 = {}
     for mo in ModesL1:
-        InvCost_L1[mo] = quicksum(
-            f1[p, c, mo] * (df.loc[mo, "SS (€/unit)"] + df.loc[mo, "h (€/unit)"] * df.loc[mo, "LT (days)"])
-            for p in Plants for c in Crossdocks
+        InvCost_L1[mo] = (
+            quicksum(
+                f1[p, c, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for p in Plants for c in Crossdocks
+            )
+            + quicksum(
+                f1[p, c, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for p in Plants for c in Crossdocks
+            )
         )
-
+    
     Total_InvCost_L1 = quicksum(InvCost_L1[mo] for mo in ModesL1)
 
-
-    #Layer 2
-
+    # Layer 2
     InvCost_L2 = {}
     for mo in Modes:
-        InvCost_L2[mo] = quicksum(
-            f2[c, d, mo] * (df.loc[mo, "SS (€/unit)"] + df.loc[mo, "h (€/unit)"] * df.loc[mo, "LT (days)"])
-            for c in Crossdocks for d in Dcs
+        InvCost_L2[mo] = (
+            quicksum(
+                f2[c, d, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for c in Crossdocks for d in Dcs
+            )
+            + quicksum(
+                f2[c, d, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for c in Crossdocks for d in Dcs
+            )
         )
-
+    
     Total_InvCost_L2 = quicksum(InvCost_L2[mo] for mo in Modes)
-
-
-
+    
+    
     Whole_L2 = Total_InvCost_L2 
+    
     # Layer 3
-
     InvCost_L3 = {}
     for mo in Modes:
-        InvCost_L3[mo] = quicksum(
-            f3[d, r, mo] * (df.loc[mo, "SS (€/unit)"] + df.loc[mo, "h (€/unit)"] * df.loc[mo, "LT (days)"])
-            for d in Dcs for r in Retailers
+        InvCost_L3[mo] = (
+            quicksum(
+                f3[d, r, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for d in Dcs for r in Retailers
+            )
+            + quicksum(
+                f3[d, r, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for d in Dcs for r in Retailers
+            )
         )
-
+    
     Total_InvCost_L3 = quicksum(InvCost_L3[mo] for mo in Modes)
-
-
+    
+    # Combine
     Total_InvCost_Model = Total_InvCost_L1 + Whole_L2 + Total_InvCost_L3
+
+
 
     ######################## Sourcing & handling ##############################3
     Sourcing_L1 = quicksum(sourcing_cost[p] * quicksum(f1[p, c, mo] for c in Crossdocks for mo in ModesL1) for p in Plants)
@@ -329,7 +369,6 @@ def run_scenario(
     )
 
     Handling_L2 = Handling_L2_existing 
-    
 
     Handling_L3 = quicksum(handling_dc[d] * quicksum(f3[d, r, mo] for r in Retailers for mo in Modes) for d in Dcs)
 
@@ -340,6 +379,7 @@ def run_scenario(
         co2_prod_kg_per_unit[p] * quicksum(f1[p, c, mo] for c in Crossdocks for mo in ModesL1)
         for p in Plants
     )
+
 
 
     # Last-mile cost (per unit delivered)
@@ -379,7 +419,7 @@ def run_scenario(
         name="CrossdockBalance"
     )
 
-
+    #capacity link big M
     # DC capacity
     model.addConstrs(
         (quicksum(f3[d, r, mo] for r in Retailers for mo in Modes) <= dc_capacity[d]
@@ -439,6 +479,12 @@ def run_scenario(
 
         print("Total objective:", model.ObjVal)   
         
+    E_air         = (CO2_tr_L1_air + CO2_tr_L2_air + CO2_tr_L3_air).getValue()
+    E_sea         = (CO2_tr_L1_sea + CO2_tr_L2_sea + CO2_tr_L3_sea).getValue()
+    E_road        = (CO2_tr_L2_road + CO2_tr_L3_road).getValue()   # no road on L1
+    E_lastmile    = LastMile_CO2.getValue()
+    E_production  = CO2_prod_L1.getValue()
+        
     results = {
     # --- Transport Costs ---
     "Transport_L1": sum(Transport_L1[mo].getValue() for mo in ModesL1),
@@ -460,14 +506,21 @@ def run_scenario(
     "Handling_L2_existing": Handling_L2_existing.getValue(),
     "Handling_L2_total": Handling_L2.getValue(),
     "Handling_L3": Handling_L3.getValue(),
+    
+    # --- Emission Calculations ---
+    "E_air": E_air,
+    "E_sea": E_sea,
+    "E_road": E_road,
+    "E_lastmile": E_lastmile,
+    "E_production": E_production,
 
-
+    
+    
     # --- Objective ---
     "Objective_value": model.ObjVal
     }
 
     return results, model
-
 
 
 def extract_var_values(model):
@@ -503,8 +556,8 @@ def simulate_scenarios_full():
         co2_values = [1 * i / 100 for i in range(0, 100)]
         product_weights = [2.58]
         CO_2_CostsAtMfg = [37.50]
-        unit_penaltycost = [1]
-
+        unit_penaltycost = [1.7]
+        
         scenario_counter = 0
 
         for co2_pct in co2_values:
@@ -567,36 +620,61 @@ def simulate_scenarios_full():
         df_summary.to_excel(writer, sheet_name=sheet_name, index=False)
 
         # --- Array-style simplified summary ---
+        # --- Reformatted array-style summary (new format) ---
+        # --- Reformatted array-style summary (NEW, using emission components) ---
         formatted_summary = []
         for record in results_summary:
             formatted_row = [
-                record.get("CO2_percentage", 0),
-                record.get("CO2_Total", 0),
-                record.get("Objective_value", 0),
-                record.get("Transport_L1", 0) + record.get("Transport_L2", 0) + record.get("Transport_L3", 0),
-                record.get("Sourcing_L1", 0) + record.get("Handling_L2_total", 0) + record.get("Handling_L3", 0),
-                record.get("CO2_Manufacturing_State1", 0),
-                record.get("Inventory_L1", 0) + record.get("Inventory_L2", 0) + record.get("Inventory_L3", 0),
-                record.get("f1[TW,ATVIE,air]", 0) + record.get("f1[TW,PLGDN,air]", 0) + record.get("f1[TW,FRCDG,air]", 0),
-                record.get("f1[SHA,ATVIE,air]", 0) + record.get("f1[SHA,PLGDN,air]", 0) + record.get("f1[SHA,FRCDG,air]", 0),
-                sum(v for k, v in record.items() if "f1" in k and "air" in k),
-                sum(v for k, v in record.items() if "f1" in k and "sea" in k),
-                sum(v for k, v in record.items() if "f2" in k and "air" in k),
-                sum(v for k, v in record.items() if "f2" in k and "sea" in k),
-                sum(v for k, v in record.items() if "f2" in k and "road" in k),
-                sum(v for k, v in record.items() if "f3" in k and "air" in k),
-                sum(v for k, v in record.items() if "f3" in k and "sea" in k),
-                sum(v for k, v in record.items() if "f3" in k and "road" in k),
-                sum(v for k, v in record.items() if "f3" in k)
+                record.get("CO2_percentage", 0),                 # CO2 Reduction %
+                record.get("CO2_Total", 0),                      # Total Emissions (tons)
+                record.get("E_air", 0),                          # E(Air)
+                record.get("E_sea", 0),                          # E(Sea)
+                record.get("E_road", 0),                         # E(Road)
+                record.get("E_lastmile", 0),                     # E(Last-mile)
+                record.get("E_production", 0),                   # E(Production)
+                record.get("Objective_value", 0),                # Total Cost
+                record.get("Transport_L1", 0)
+                + record.get("Transport_L2", 0)
+                + record.get("Transport_L3", 0),                 # Transportation Cost
+                record.get("Sourcing_L1", 0)
+                + record.get("Handling_L2_total", 0)
+                + record.get("Handling_L3", 0),                  # Sourcing/Handling Cost
+                record.get("CO2_Manufacturing_State1", 0),       # CO2 Cost in Production (€, not tons)
+                record.get("Inventory_L1", 0)
+                + record.get("Inventory_L2", 0)
+                + record.get("Inventory_L3", 0),                 # Transit Inventory Cost
+                record.get("f1[TW,ATVIE,air]", 0)
+                + record.get("f1[TW,PLGDN,air]", 0)
+                + record.get("f1[TW,FRCDG,air]", 0)
+                +record.get("f1[TW,ATVIE,sea]", 0)
+                + record.get("f1[TW,PLGDN,sea]", 0)
+                + record.get("f1[TW,FRCDG,sea]", 0),             # TW Outbound
+                record.get("f1[SHA,ATVIE,air]", 0)
+                + record.get("f1[SHA,PLGDN,air]", 0)
+                + record.get("f1[SHA,FRCDG,air]", 0)
+                +record.get("f1[SHA,ATVIE,sea]", 0)
+                + record.get("f1[SHA,PLGDN,sea]", 0)
+                + record.get("f1[SHA,FRCDG,sea]", 0),            # SHA Outbound
+                
+                sum(v for k, v in record.items() if "f1" in k and "air"  in k),  # Layer1Air (units)
+                sum(v for k, v in record.items() if "f1" in k and "sea"  in k),  # Layer1Sea
+                sum(v for k, v in record.items() if "f2" in k and "air"  in k),  # Layer2Air
+                sum(v for k, v in record.items() if "f2" in k and "sea"  in k),  # Layer2Sea
+                sum(v for k, v in record.items() if "f2" in k and "road" in k),  # Layer2Road
+                sum(v for k, v in record.items() if "f3" in k and "air"  in k),  # Layer3Air
+                sum(v for k, v in record.items() if "f3" in k and "sea"  in k),  # Layer3Sea
+                sum(v for k, v in record.items() if "f3" in k and "road" in k),  # Layer3Road
+                sum(v for k, v in record.items() if "f3" in k)                   # DemandFulfillment
             ]
             formatted_summary.append(formatted_row)
 
         headers = [
-            "CO2 Reduction %", "Total Emissions", "Total Cost", "Transportation Cost",
-            "Sourcing/Handling Cost", "CO2 Cost in Production", "Transit Inventory Cost",
-            "TW Outbound", "SHA Outbound", "Layer1Air", "Layer1Sea",
-            "Layer2Air", "Layer2Sea", "Layer2Road", "Layer3Air", "Layer3Sea",
-            "Layer3Road", "DemandFulfillment"
+            "CO2 Reduction %", "Total Emissions", "E(Air)", "E(Sea)", "E(Road)",
+            "E(Last-mile)", "E(Production)", "Total Cost", "Transportation Cost",
+            "Sourcing/Handling Cost", "CO2 Cost in Production",
+            "Transit Inventory Cost", "TW Outbound", "SHA Outbound",
+            "Layer1Air", "Layer1Sea", "Layer2Air", "Layer2Sea", "Layer2Road",
+            "Layer3Air", "Layer3Sea", "Layer3Road", "DemandFulfillment"
         ]
 
         df_array = pd.DataFrame(formatted_summary, columns=headers)
