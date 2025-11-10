@@ -5,7 +5,6 @@ import gurobipy as gp
 # ================================================================
 # 🧩 Safe Imports
 # ================================================================
-# Import models only after Streamlit initializes (to avoid long load times)
 try:
     from SC1F import run_scenario as run_SC1F
     from SC2F import run_scenario as run_SC2F
@@ -13,75 +12,58 @@ except Exception as e:
     st.error(f"❌ Error importing optimization modules: {e}")
 
 # ================================================================
-# 🔐 Load Gurobi WLS credentials securely (from Streamlit secrets)
+# 🔐 Load Gurobi WLS credentials (from Streamlit secrets)
 # ================================================================
 for var in ["GRB_WLSACCESSID", "GRB_WLSSECRET", "GRB_LICENSEID"]:
     if var in st.secrets:
         os.environ[var] = st.secrets[var]
 
 # ================================================================
-# 🏷️ App layout
+# 🏷️ Layout
 # ================================================================
 st.set_page_config(page_title="Global Supply Chain Optimization", layout="centered")
 st.title("🌍 Global Supply Chain Optimization (Gurobi)")
-
-st.markdown("""
-Use this web interface to run optimization scenarios with or without allowing new facility openings.  
-The model runs in the cloud using your Gurobi Web License (WLS).
-""")
+st.markdown("Enter any numeric value (≥ 0) for each parameter below, then run the optimization.")
 
 # ================================================================
 # 🧩 Model selection
 # ================================================================
 model_choice = st.selectbox(
     "Select optimization model:",
-    (
-        "SC1F – Existing Facilities Only",
-        "SC2F – Allow New Facilities",
-    )
+    ("SC1F – Existing Facilities Only", "SC2F – Allow New Facilities")
 )
 
 # ================================================================
-# 🎛️ Common parameters
+# 🧠 Helper function for manual numeric input
+# ================================================================
+def positive_input(label, default):
+    val_str = st.text_input(label, value=str(default))
+    try:
+        val = float(val_str)
+        if val < 0:
+            st.warning(f"{label} must be ≥ 0. Using 0 instead.")
+            return 0.0
+        return val
+    except ValueError:
+        st.warning(f"{label} must be numeric. Using default {default}.")
+        return default
+
+# ================================================================
+# 🎛️ Parameters
 # ================================================================
 st.subheader("📊 Scenario Parameters")
 
-co2_pct = st.number_input(
-    "CO₂ Reduction Target (%)",
-    min_value=0.0, max_value=100.0, value=50.0, step=1.0,
-    help="Target percentage reduction in CO₂ emissions relative to baseline"
-) / 100.0
+co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100.0
+product_weight = positive_input("Product Weight (kg)", 2.58)
+unit_penaltycost = positive_input("Unit Penalty Cost (€)", 1.7)
 
-product_weight = st.number_input(
-    "Product Weight (kg)",
-    min_value=0.1, max_value=100.0, value=2.58, step=0.1,
-    help="Average product weight in kilograms"
-)
-
-unit_penaltycost = st.number_input(
-    "Unit Penalty Cost (€)",
-    min_value=0.0, max_value=10.0, value=1.7, step=0.1,
-    help="Penalty cost per unit for unmet demand or deviations"
-)
-
-# ================================================================
-# ⚙️ Model-specific parameters
-# ================================================================
 if "SC1F" in model_choice:
     st.subheader("⚙️ Parameters for SC1F (Existing Facilities)")
-    co2_cost_per_ton = st.number_input(
-        "CO₂ Cost per ton (€)",
-        min_value=0.0, max_value=1000.0, value=37.50, step=1.0,
-        help="CO₂ cost applied to production and transport (€/ton)"
-    )
+    co2_cost_per_ton = positive_input("CO₂ Cost per ton (€)", 37.50)
 
 elif "SC2F" in model_choice:
     st.subheader("⚙️ Parameters for SC2F (Allows New Facilities)")
-    co2_cost_per_ton_New = st.number_input(
-        "CO₂ Cost per ton (New Facilities) (€)",
-        min_value=0.0, max_value=1000.0, value=60.00, step=1.0,
-        help="CO₂ cost per ton applied for new facilities"
-    )
+    co2_cost_per_ton_New = positive_input("CO₂ Cost per ton (New Facilities) (€)", 60.00)
 
 # ================================================================
 # ▶️ Run Optimization
@@ -108,9 +90,7 @@ if st.button("Run Optimization"):
 
             st.success("Optimization completed successfully ✅")
 
-            # ===============================
-            # 📈 Display results
-            # ===============================
+            # Results
             st.subheader("💰 Objective Value")
             st.metric("Total Cost (€)", f"{results['Objective_value']:,.2f}")
 
