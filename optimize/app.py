@@ -37,6 +37,7 @@ model_choice = st.selectbox(
 # 🧠 Helper function for manual numeric input
 # ================================================================
 def positive_input(label, default):
+    """Takes a text input, validates it as a non-negative float."""
     val_str = st.text_input(label, value=str(default))
     try:
         val = float(val_str)
@@ -55,7 +56,6 @@ st.subheader("📊 Scenario Parameters")
 
 co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100.0
 product_weight = positive_input("Product Weight (kg)", 2.58)
-unit_penaltycost = positive_input("Unit Penalty Cost (€)", 1.7)
 
 if "SC1F" in model_choice:
     st.subheader("⚙️ Parameters for SC1F (Existing Facilities)")
@@ -76,7 +76,6 @@ if st.button("Run Optimization"):
                     CO_2_percentage=co2_pct,
                     product_weight=product_weight,
                     co2_cost_per_ton=co2_cost_per_ton,
-                    unit_penaltycost=unit_penaltycost,
                     print_results="NO"
                 )
             else:
@@ -84,7 +83,6 @@ if st.button("Run Optimization"):
                     CO_2_percentage=co2_pct,
                     product_weight=product_weight,
                     co2_cost_per_ton_New=co2_cost_per_ton_New,
-                    unit_penaltycost=unit_penaltycost,
                     print_results="NO"
                 )
 
@@ -107,4 +105,4 @@ if st.button("Run Optimization"):
         except gp.GurobiError as ge:
             st.error(f"Gurobi Error {ge.errno}: {ge.message}")
         except Exception as e:
-            st.error(f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n {e}")
+            st.error(f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n{e}")
