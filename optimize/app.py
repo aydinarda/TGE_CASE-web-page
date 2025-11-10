@@ -1,8 +1,16 @@
 import os
 import streamlit as st
 import gurobipy as gp
-from SC1F import run_scenario as run_SC1F
-from SC2F import run_scenario as run_SC2F
+
+# ================================================================
+# 🧩 Safe Imports
+# ================================================================
+# Import models only after Streamlit initializes (to avoid long load times)
+try:
+    from SC1F import run_scenario as run_SC1F
+    from SC2F import run_scenario as run_SC2F
+except Exception as e:
+    st.error(f"❌ Error importing optimization modules: {e}")
 
 # ================================================================
 # 🔐 Load Gurobi WLS credentials securely (from Streamlit secrets)
@@ -18,7 +26,8 @@ st.set_page_config(page_title="Global Supply Chain Optimization", layout="center
 st.title("🌍 Global Supply Chain Optimization (Gurobi)")
 
 st.markdown("""
-Use this web interface to run optimization scenarios with or without allowing new facility openings.
+Use this web interface to run optimization scenarios with or without allowing new facility openings.  
+The model runs in the cloud using your Gurobi Web License (WLS).
 """)
 
 # ================================================================
@@ -99,11 +108,12 @@ if st.button("Run Optimization"):
 
             st.success("Optimization completed successfully ✅")
 
-            # Objective value
+            # ===============================
+            # 📈 Display results
+            # ===============================
             st.subheader("💰 Objective Value")
             st.metric("Total Cost (€)", f"{results['Objective_value']:,.2f}")
 
-            # CO₂ Breakdown
             st.subheader("🌿 CO₂ Emissions Breakdown (tons)")
             st.json({
                 "Air": round(results.get("E_air", 0), 2),
@@ -114,5 +124,7 @@ if st.button("Run Optimization"):
                 "Total": round(results.get("CO2_Total", 0), 2),
             })
 
+        except gp.GurobiError as ge:
+            st.error(f"Gurobi Error {ge.errno}: {ge.message}")
         except Exception as e:
-            st.error(f"Optimization failed: {e}")
+            st.error(f"❌ Optimization failed: {e}")

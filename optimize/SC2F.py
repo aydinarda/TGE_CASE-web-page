@@ -704,5 +704,6 @@ def simulate_scenarios_full():
     writer.close()
     print("\n🎯 All demand-level scenarios saved in 'simulation_results_demand_levelsSC2.xlsx'!")
 
+if __name__ == "__main__":
+    simulate_scenarios_full()
 
-simulate_scenarios_full()

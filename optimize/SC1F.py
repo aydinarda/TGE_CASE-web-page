@@ -685,4 +685,5 @@ def simulate_scenarios_full():
     writer.close()
     print("\n🎯 All demand-level simulations completed!")
 
-simulate_scenarios_full()
+if __name__ == "__main__":
+    simulate_scenarios_full()
