@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 
 
 
-GA_ID = "G-GX08X4DT1S"   # <-- put your GA Measurement ID here
+GA_ID = "G-7H9MWM0R26"   # <-- put your GA Measurement ID here
 
 # keep consent in session
 consent = st.session_state.get("consent")
@@ -219,3 +219,4 @@ if st.button("Run Optimization"):
             st.error(f"Gurobi Error {ge.errno}: {ge.message}")
         except Exception as e:
             st.error(f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n{e}")
+
