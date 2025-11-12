@@ -11,106 +11,17 @@ import streamlit.components.v1 as components
 
 
 
-GA_ID = "G-7H9MWM0R26"   # <-- put your GA Measurement ID here
-
-# keep consent in session
-consent = st.session_state.get("consent")
-
-if consent != "yes":
-    choice = components.html(f"""
-        <html>
-        <head>
-          <style>
-            .cookie-banner {{
-              position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-              background: #f0f2f6; border-top: 1px solid #ccc;
-              padding: 14px 20px; display:flex; justify-content:space-between; align-items:center;
-              font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-              box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
-            }}
-            .cookie-text {{ color:#333; font-size:15px; }}
-            .btns {{ display:flex; gap:10px; }}
-            .yes {{ background:#00b14f; color:#fff; border:0; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer; }}
-            .yes:hover {{ background:#00a046; }}
-            .no  {{ background:transparent; border:1px solid #ccc; color:#555; padding:8px 14px; border-radius:6px; cursor:pointer; }}
-          </style>
-        </head>
-        <body>
-          <div id="banner" class="cookie-banner" style="display:none">
-            <div class="cookie-text">🍪 We use anonymized analytics to improve the app.</div>
-            <div class="btns">
-              <button class="yes" id="accept">Yes, enable analytics</button>
-              <button class="no"  id="decline">No, thanks</button>
-            </div>
-          </div>
-
-          <script>
-            const GA_ID = "{GA_ID}";
-            function loadGA(){{
-              if (window.GA_LOADED) return;
-              const s1 = document.createElement('script');
-              s1.async = true; s1.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
-              document.head.appendChild(s1);
-              const s2 = document.createElement('script');
-              s2.innerHTML = `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){{dataLayer.push(arguments);}}
-                gtag('js', new Date());
-                gtag('config', '${{GA_ID}}');
-              `;
-              document.head.appendChild(s2);
-              window.GA_LOADED = true;
-            }}
-
-            // read/write consent in THIS iframe's localStorage
-            const saved = localStorage.getItem("user_consent");
-            const banner = document.getElementById("banner");
-
-            if (saved === "yes") {{
-              loadGA();
-              // tell Streamlit
-              Streamlit.setComponentValue("yes");
-            }} else if (saved === "no") {{
-              Streamlit.setComponentValue("no");
-            }} else {{
-              // show banner
-              banner.style.display = "flex";
-            }}
-
-            document.getElementById("accept")?.addEventListener("click", () => {{
-              localStorage.setItem("user_consent","yes");
-              banner.remove();
-              loadGA();
-              Streamlit.setComponentValue("yes");
-            }});
-
-            document.getElementById("decline")?.addEventListener("click", () => {{
-              localStorage.setItem("user_consent","no");
-              banner.remove();
-              Streamlit.setComponentValue("no");
-            }});
-          </script>
-        </body>
-        </html>
-    """, height=96)
-
-    # choice will be "yes" or "no" after user clicks OR if stored consent was found
-    if choice in ("yes", "no"):
-        st.session_state["consent"] = choice
-
-# If consent already given in this Streamlit session, ensure GA is loaded (in case component didn’t yet)
-if st.session_state.get("consent") == "yes":
-    components.html(f"""
-        <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){{dataLayer.push(arguments);}}
-          gtag('js', new Date());
-          gtag('config', '{GA_ID}');
-        </script>
-    """, height=0)
-
-
+components.html("""
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7H9MWM0R26"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-7H9MWM0R26');
+      console.log("✅ GA tag fired!");
+    </script>
+""", height=0)
 
 
 
@@ -219,4 +130,3 @@ if st.button("Run Optimization"):
             st.error(f"Gurobi Error {ge.errno}: {ge.message}")
         except Exception as e:
             st.error(f"❌ This solution was never feasible — even Swiss precision couldn't optimize it! 🇨🇭\n\n{e}")
-
