@@ -12,15 +12,22 @@ import streamlit.components.v1 as components
 
 
 
-components.html("""
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7H9MWM0R26"></script>
+
+GA_MEASUREMENT_ID = "G-7H9MWM0R26"
+
+# --- Google Analytics 4 Tracking (Streamlit-safe) ---
+components.html(f"""
+    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
+      function gtag(){{dataLayer.push(arguments);}}
       gtag('js', new Date());
-      gtag('config', 'G-7H9MWM0R26');
-      console.log("✅ GA4 tag loaded and event fired");
+      gtag('config', '{GA_MEASUREMENT_ID}', {{
+        'page_title': document.title,
+        'page_path': window.location.pathname
+      }});
+      gtag('event', 'page_view');
+      console.log("✅ GA4 tag injected for {GA_MEASUREMENT_ID}");
     </script>
 """, height=0)
 
