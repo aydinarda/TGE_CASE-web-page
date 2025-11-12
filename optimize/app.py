@@ -110,7 +110,7 @@ if st.session_state.consent_given or consent_event == "yes":
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', 'G-XXXXXXXXXX');
+          gtag('config', 'G-GX08X4DT1S');
         </script>
     """, unsafe_allow_html=True)
 
