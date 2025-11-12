@@ -2,6 +2,124 @@ import os
 import streamlit as st
 import gurobipy as gp
 
+
+
+# ================================================================
+# Analysis
+# ================================================================
+
+
+
+# --- Session flag (for current run) ---
+if "consent_given" not in st.session_state:
+    st.session_state.consent_given = False
+
+# --- Consent banner with localStorage persistence ---
+st.markdown("""
+    <style>
+    .cookie-banner {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #f0f2f6;
+        border-top: 1px solid #ccc;
+        padding: 15px 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 100;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    }
+    .cookie-text {
+        font-size: 15px;
+        color: #333;
+    }
+    .cookie-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    .cookie-yes {
+        background-color: #00b14f;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .cookie-yes:hover {
+        background-color: #009b45;
+    }
+    .cookie-no {
+        background-color: transparent;
+        color: #555;
+        border: 1px solid #ccc;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    </style>
+
+    <script>
+    // Check if consent is already saved
+    const consent = localStorage.getItem("user_consent");
+    if (consent === "yes") {
+        window.parent.postMessage({ type: "CONSENT_ACCEPTED" }, "*");
+    } else if (consent === "no") {
+        window.parent.postMessage({ type: "CONSENT_DECLINED" }, "*");
+    } else {
+        // Show banner if no prior choice
+        document.addEventListener("DOMContentLoaded", function() {
+            const banner = document.createElement("div");
+            banner.classList.add("cookie-banner");
+            banner.innerHTML = `
+                <div class="cookie-text">
+                    🍪 We use cookies for anonymized analytics to improve app performance.
+                </div>
+                <div class="cookie-buttons">
+                    <button class="cookie-yes">Yes, enable analytics</button>
+                    <button class="cookie-no">No, thanks</button>
+                </div>`;
+            document.body.appendChild(banner);
+
+            banner.querySelector(".cookie-yes").onclick = function() {
+                localStorage.setItem("user_consent", "yes");
+                banner.remove();
+                window.parent.postMessage({ type: "CONSENT_ACCEPTED" }, "*");
+            };
+            banner.querySelector(".cookie-no").onclick = function() {
+                localStorage.setItem("user_consent", "no");
+                banner.remove();
+                window.parent.postMessage({ type: "CONSENT_DECLINED" }, "*");
+            };
+        });
+    }
+    </script>
+""", unsafe_allow_html=True)
+
+# --- React to messages from the iframe JS ---
+consent_event = st.experimental_get_query_params().get("consent_status", [None])[0]
+
+# --- Once consent is remembered ---
+if st.session_state.consent_given or consent_event == "yes":
+    st.session_state.consent_given = True
+    st.markdown("""
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-XXXXXXXXXX');
+        </script>
+    """, unsafe_allow_html=True)
+
+
+
+
+
+
+
 # ================================================================
 # 🧩 Safe Imports
 # ================================================================
