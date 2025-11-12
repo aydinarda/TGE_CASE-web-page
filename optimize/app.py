@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 
 
 
+
 components.html("""
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7H9MWM0R26"></script>
@@ -19,10 +20,9 @@ components.html("""
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-7H9MWM0R26');
-      console.log("✅ GA tag fired!");
+      console.log("✅ GA4 tag loaded and event fired");
     </script>
 """, height=0)
-
 
 
 
