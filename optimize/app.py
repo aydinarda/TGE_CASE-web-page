@@ -15,22 +15,30 @@ import streamlit.components.v1 as components
 
 GA_MEASUREMENT_ID = "G-7H9MWM0R26"
 
-# --- Google Analytics 4 Tracking (Streamlit-safe) ---
+# --- Reliable GA4 injection (forces v=2 GA4 endpoint) ---
 components.html(f"""
-    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){{dataLayer.push(arguments);}}
-      gtag('js', new Date());
-      gtag('config', '{GA_MEASUREMENT_ID}', {{
-        'page_title': document.title,
-        'page_path': window.location.pathname
-      }});
-      gtag('event', 'page_view');
-      console.log("✅ GA4 tag injected for {GA_MEASUREMENT_ID}");
-    </script>
-""", height=0)
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{dataLayer.push(arguments);}}
+  gtag('js', new Date());
 
+  // ---- GA4 CONFIG ----
+  gtag('config', '{GA_MEASUREMENT_ID}', {{
+      send_page_view: false
+  }});
+
+  // ---- Force a GA4-style page_view event ----
+  gtag('event', 'page_view', {{
+      page_title: document.title,
+      page_location: window.location.href,
+      page_path: window.location.pathname
+  }});
+
+  console.log("✅ GA4 page_view sent via {GA_MEASUREMENT_ID}");
+</script>
+""", height=0)
 
 
 # ================================================================
