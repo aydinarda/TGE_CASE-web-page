@@ -1,16 +1,27 @@
+name: Keep Streamlit Alive
+
 on:
   schedule:
-    - cron: "0 */8 * * *"   
-  workflow_dispatch:         # allow manual trigger too
+    - cron: "0 */4 * * *"   # every 4 hours (safe for GitHub Actions)
+  workflow_dispatch:
 
 jobs:
-  ping:
+  keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit app 1 (streamlit-app.py)
+      - name: Wake function
         run: |
-          curl -L --silent "https://tnecase-web-page.streamlit.app/" || echo "Ping 1 failed"
-      
-      - name: Ping Streamlit app 2 (stremlit-app-SC1.py)
-        run: |
-          curl -L --silent "https://tnecase-web-page-sc1.streamlit.app/" || echo "Ping 2 failed"
+          wake() {
+            echo "Waking $1"
+            curl -L --silent \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0" \
+              "$1?refresh=$(date +%s)" \
+              > /dev/null || echo "Failed to wake $1"
+          }
+
+          wake "https://tnecase-web-page.streamlit.app/"
+          wake "https://tnecase-web-page-sc1.streamlit.app/"
+          wake "https://tneopt-app.streamlit.app/"
+          wake "https://tnecase-opt.streamlit.app/"
+          wake "https://tnecase-web-page-01.streamlit.app/"
+          wake "https://tne-case-web-sc1.streamlit.app/"
