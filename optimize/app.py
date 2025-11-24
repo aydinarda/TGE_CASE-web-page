@@ -4,7 +4,8 @@ import gurobipy as gp
 import streamlit.components.v1 as components
 
 
-GA_MEASUREMENT_ID = "G-7H9MWM0R26"
+
+GA_MEASUREMENT_ID = "G-78BY82MRZ3"
 
 # -------- FIXED + VERIFIED GA4 INJECTION FOR STREAMLIT --------
 components.html(
