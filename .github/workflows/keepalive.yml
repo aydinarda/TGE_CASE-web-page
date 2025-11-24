@@ -20,7 +20,7 @@ jobs:
 
       - name: Wake Streamlit apps via real browser
         run: |
-          python - <<EOF
+        python - <<EOF
 from playwright.sync_api import sync_playwright
 
 apps = [
