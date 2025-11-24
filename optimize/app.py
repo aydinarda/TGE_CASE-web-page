@@ -4,41 +4,36 @@ import gurobipy as gp
 import streamlit.components.v1 as components
 
 
-
-# ================================================================
-# Analysis
-# ================================================================
-
-
-
-
-
 GA_MEASUREMENT_ID = "G-7H9MWM0R26"
 
-# --- Reliable GA4 injection (forces v=2 GA4 endpoint) ---
-components.html(f"""
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){{dataLayer.push(arguments);}}
-  gtag('js', new Date());
+# -------- FIXED + VERIFIED GA4 INJECTION FOR STREAMLIT --------
+components.html(
+    f"""
+    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
+    <script>
+      // --- GA4 Setup ---
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {{ dataLayer.push(arguments); }}
+      gtag('js', new Date());
+      
+      // Force GA4 to send page view even inside iframe
+      gtag('config', '{GA_MEASUREMENT_ID}', {{
+          'send_page_view': true,
+          'page_title': 'Streamlit App',
+          'page_path': window.location.pathname + window.location.search + window.location.hash
+      }});
 
-  // ---- GA4 CONFIG ----
-  gtag('config', '{GA_MEASUREMENT_ID}', {{
-      send_page_view: false
-  }});
-
-  // ---- Force a GA4-style page_view event ----
-  gtag('event', 'page_view', {{
-      page_title: document.title,
-      page_location: window.location.href,
-      page_path: window.location.pathname
-  }});
-
-  console.log("✅ GA4 page_view sent via {GA_MEASUREMENT_ID}");
-</script>
-""", height=0)
+      // Heartbeat to keep session active + generate reliable events
+      setInterval(function() {{
+          gtag('event', 'heartbeat', {{
+              'event_category': 'engagement',
+              'event_label': 'ping'
+          }});
+      }}, 15000); // every 15 sec
+    </script>
+    """,
+    height=10,   # MUST NOT be 0 — GA will NOT run at height=0
+)
 
 
 # ================================================================
