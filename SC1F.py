@@ -12,6 +12,48 @@ from scipy.stats import norm
 from helpers import print_flows, print_mode_breakdown, compute_inventory_cost, compute_transport_cost
 import time
 import json
+import streamlit.components.v1 as components
+
+
+
+GA_MEASUREMENT_ID = "G-3H3B3BNF4Z"
+
+
+
+components.html(f"""
+<script>
+(function() {{
+
+    const targetDoc = window.parent.document;
+
+    const old1 = targetDoc.getElementById("ga-tag");
+    const old2 = targetDoc.getElementById("ga-src");
+    if (old1) old1.remove();
+    if (old2) old2.remove();
+
+    const s1 = targetDoc.createElement('script');
+    s1.id = "ga-src";
+    s1.async = true;
+    s1.src = "https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}";
+    targetDoc.head.appendChild(s1);
+
+    const s2 = targetDoc.createElement('script');
+    s2.id = "ga-tag";
+    s2.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {{ dataLayer.push(arguments); }}
+        gtag('js', new Date());
+        gtag('config', '{GA_MEASUREMENT_ID}', {{
+            send_page_view: true
+        }});
+    `;
+    targetDoc.head.appendChild(s2);
+
+    console.log("GA injected into TOP WINDOW → OK");
+
+}})();
+</script>
+""", height=50)
 
 
 
@@ -685,4 +727,5 @@ def simulate_scenarios_full():
     writer.close()
     print("\n🎯 All demand-level simulations completed!")
 
-simulate_scenarios_full()
+if __name__ == "__main__":
+    simulate_scenarios_full()
