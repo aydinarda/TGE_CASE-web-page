@@ -11,6 +11,51 @@ import requests
 from io import BytesIO
 import openpyxl
 
+import streamlit.components.v1 as components
+    
+
+# ----------------------------------------------------
+# GA TRACKING SHOULD BE HERE
+# ----------------------------------------------------
+GA_MEASUREMENT_ID = "G-3VLC0TEGGV"
+
+components.html(f"""
+<script>
+(function() {{
+
+    const targetDoc = window.parent.document;
+
+    const old1 = targetDoc.getElementById("ga-tag");
+    const old2 = targetDoc.getElementById("ga-src");
+    if (old1) old1.remove();
+    if (old2) old2.remove();
+
+    const s1 = targetDoc.createElement('script');
+    s1.id = "ga-src";
+    s1.async = true;
+    s1.src = "https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}";
+    targetDoc.head.appendChild(s1);
+
+    const s2 = targetDoc.createElement('script');
+    s2.id = "ga-tag";
+    s2.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {{ dataLayer.push(arguments); }}
+        gtag('js', new Date());
+        gtag('config', '{GA_MEASUREMENT_ID}', {{
+            send_page_view: true
+        }});
+    `;
+    targetDoc.head.appendChild(s2);
+
+    console.log("GA injected into TOP WINDOW → OK");
+
+}})();
+</script>
+""", height=50)
+
+
+
 # ----------------------------------------------------
 # CONFIGURATION
 # ----------------------------------------------------
