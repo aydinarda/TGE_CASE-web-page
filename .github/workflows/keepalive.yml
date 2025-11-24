@@ -29,12 +29,10 @@ jobs:
 from playwright.sync_api import sync_playwright
 
 apps = [
-    "https://tnecase-web-page.streamlit.app/",
-    "https://tnecase-web-page-sc1.streamlit.app/",
     "https://tneopt-app.streamlit.app/",
     "https://tnecase-opt.streamlit.app/",
     "https://tnecase-web-page-01.streamlit.app/",
-    "https://tne-case-web-sc1.streamlit.app/"
+    "https://tne-case-web-sc1.streamlit.app/",
 ]
 
 print("Starting Playwright keepalive...")
