@@ -8,6 +8,33 @@ import streamlit.components.v1 as components
 
 GA_MEASUREMENT_ID = "G-78BY82MRZ3"
 
+
+
+
+# ================================================================
+# 🧩 Safe Imports
+# ================================================================
+try:
+    from SC1F import run_scenario as run_SC1F
+    from SC2F import run_scenario as run_SC2F
+except Exception as e:
+    st.error(f"❌ Error importing optimization modules: {e}")
+
+# ================================================================
+# 🔐 Load Gurobi WLS credentials (from Streamlit secrets)
+# ================================================================
+for var in ["GRB_WLSACCESSID", "GRB_WLSSECRET", "GRB_LICENSEID"]:
+    if var in st.secrets:
+        os.environ[var] = st.secrets[var]
+
+# ================================================================
+# 🏷️ Layout
+# ================================================================
+st.set_page_config(page_title="Global Supply Chain Optimization", layout="centered")
+st.title("🌍 Global Supply Chain Optimization (Gurobi)")
+st.markdown("Enter any numeric value (≥ 0) for each parameter below, then run the optimization.")
+
+
 components.html(f"""
 <script>
 (function() {{
@@ -47,29 +74,6 @@ components.html(f"""
 </script>
 """, height=100)
 
-
-# ================================================================
-# 🧩 Safe Imports
-# ================================================================
-try:
-    from SC1F import run_scenario as run_SC1F
-    from SC2F import run_scenario as run_SC2F
-except Exception as e:
-    st.error(f"❌ Error importing optimization modules: {e}")
-
-# ================================================================
-# 🔐 Load Gurobi WLS credentials (from Streamlit secrets)
-# ================================================================
-for var in ["GRB_WLSACCESSID", "GRB_WLSSECRET", "GRB_LICENSEID"]:
-    if var in st.secrets:
-        os.environ[var] = st.secrets[var]
-
-# ================================================================
-# 🏷️ Layout
-# ================================================================
-st.set_page_config(page_title="Global Supply Chain Optimization", layout="centered")
-st.title("🌍 Global Supply Chain Optimization (Gurobi)")
-st.markdown("Enter any numeric value (≥ 0) for each parameter below, then run the optimization.")
 
 # ================================================================
 # 🧩 Model selection
