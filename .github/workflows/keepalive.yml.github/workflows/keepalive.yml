@@ -20,8 +20,8 @@ jobs:
           }
 
           wake "https://tnecase-web-page.streamlit.app/"
-          wake "https://tnecase-web-page-sc1.streamlit.app/"
-          wake "https://tneopt-app.streamlit.app/"
-          wake "https://tnecase-opt.streamlit.app/"
-          wake "https://tnecase-web-page-01.streamlit.app/"
           wake "https://tne-case-web-sc1.streamlit.app/"
+          wake "https://tneopt-app.streamlit.app/"
+          wake "https://tnecase-web-page-01.streamlit.app/"
+          wake "https://tnecase-opt.streamlit.app/"
+          wake "https://tneopt-app.streamlit.app/"
