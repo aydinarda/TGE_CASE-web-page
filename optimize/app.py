@@ -5,36 +5,47 @@ import streamlit.components.v1 as components
 
 
 
+
 GA_MEASUREMENT_ID = "G-78BY82MRZ3"
 
-# -------- FIXED + VERIFIED GA4 INJECTION FOR STREAMLIT --------
-components.html(
-    f"""
-    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
-    <script>
-      // --- GA4 Setup ---
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {{ dataLayer.push(arguments); }}
-      gtag('js', new Date());
-      
-      // Force GA4 to send page view even inside iframe
-      gtag('config', '{GA_MEASUREMENT_ID}', {{
-          'send_page_view': true,
-          'page_title': 'Streamlit App',
-          'page_path': window.location.pathname + window.location.search + window.location.hash
-      }});
+components.html(f"""
+<script>
+(function() {{
 
-      // Heartbeat to keep session active + generate reliable events
-      setInterval(function() {{
-          gtag('event', 'heartbeat', {{
-              'event_category': 'engagement',
-              'event_label': 'ping'
-          }});
-      }}, 15000); // every 15 sec
-    </script>
-    """,
-    height=10,   # MUST NOT be 0 — GA will NOT run at height=0
-)
+    // If inside Streamlit iframe → inject GA into TOP window instead
+    const targetDoc = window.parent.document;
+
+    // Remove existing GA scripts (avoid duplicates)
+    const old1 = targetDoc.getElementById("ga-tag");
+    const old2 = targetDoc.getElementById("ga-src");
+    if (old1) old1.remove();
+    if (old2) old2.remove();
+
+    // Create GA script (src)
+    const s1 = targetDoc.createElement('script');
+    s1.id = "ga-src";
+    s1.async = true;
+    s1.src = "https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}";
+    targetDoc.head.appendChild(s1);
+
+    // Create GA config script
+    const s2 = targetDoc.createElement('script');
+    s2.id = "ga-tag";
+    s2.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {{ dataLayer.push(arguments); }}
+        gtag('js', new Date());
+        gtag('config', '{GA_MEASUREMENT_ID}', {{
+            send_page_view: true
+        }});
+    `;
+    targetDoc.head.appendChild(s2);
+
+    console.log("GA injected into TOP WINDOW → OK");
+
+}})();
+</script>
+""", height=100)
 
 
 # ================================================================
