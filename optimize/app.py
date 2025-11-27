@@ -51,7 +51,7 @@ components.html(f"""
 # ================================================================
 try:
     from Scenario_Setting_For_SC1F import run_scenario as run_SC1F
-    from Scenario_Setting_For_SC1F import run_scenario as run_SC2F
+    from Scenario_Setting_For_SC2F import run_scenario as run_SC2F
 except Exception as e:
     st.error(f"❌ Error importing optimization modules: {e}")
 
