@@ -541,7 +541,7 @@ def run_scenario(
 
         # f1: Plant → Crossdock
         model.addConstrs(
-            (f1[p, c, mo] == 0
+            (f1[p, c, mo] <= 0.00001
              for p in Plants
              for c in Crossdocks
              for mo in Modes
@@ -551,7 +551,7 @@ def run_scenario(
     
         # f2: Crossdock → DC
         model.addConstrs(
-            (f2[c, d, mo] == 0
+            (f2[c, d, mo] <= 0.00001
              for c in Crossdocks
              for d in Dcs
              for mo in Modes
@@ -561,7 +561,7 @@ def run_scenario(
     
         # f2_2: Crossdock → DC (secondary)
         model.addConstrs(
-            (f2_2[c, d, mo] == 0
+            (f2_2[c, d, mo] <= 0.00001
              for c in Crossdocks
              for d in Dcs
              for mo in Modes
@@ -571,7 +571,7 @@ def run_scenario(
     
         # f3: DC → Customer
         model.addConstrs(
-            (f3[d, r, mo] == 0
+            (f3[d, r, mo] <= 0.00001
              for d in Dcs
              for r in Retailers
              for mo in Modes
