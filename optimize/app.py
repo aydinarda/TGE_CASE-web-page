@@ -50,8 +50,8 @@ components.html(f"""
 # 🧩 Safe Imports
 # ================================================================
 try:
-    from SC1F import run_scenario as run_SC1F
-    from SC2F import run_scenario as run_SC2F
+    from SC1F import run_scenario as Scenario_Setting_For_SC1F
+    from SC2F import run_scenario as Scenario_Setting_For_SC2F
 except Exception as e:
     st.error(f"❌ Error importing optimization modules: {e}")
 
@@ -67,6 +67,26 @@ for var in ["GRB_WLSACCESSID", "GRB_WLSSECRET", "GRB_LICENSEID"]:
 # ================================================================
 st.set_page_config(page_title="Global Supply Chain Optimization", layout="centered")
 st.title("🌍 Global Supply Chain Optimization (Gurobi)")
+
+# ================================================================
+# SESSION MODE TOGGLE
+# ================================================================
+mode = st.radio("Select mode:", ["Normal Mode", "Session Mode"])
+
+if "session_step" not in st.session_state:
+    st.session_state.session_step = 0
+
+# ================================================================
+# Scenario event definitions
+# ================================================================
+EVENTS = {
+    "suez_canal": "🚢 Suez Canal is blocked due to a crisis.",
+    "oil_crises": "⛽ Global oil prices surged due to a new oil crisis.",
+    "volcano": "🌋 Volcano eruption blocks all air transportation.",
+    "trade_war": "💼 Trade war increases sourcing tariffs.",
+}
+
+
 st.markdown("Enter any numeric value (≥ 0) for each parameter below, then run the optimization.")
 
 
@@ -150,9 +170,78 @@ elif "SC2F" in model_choice:
     st.subheader("⚙️ Parameters for SC2F (Allows New Facilities)")
     co2_cost_per_ton_New = positive_input("CO₂ Cost per ton (New Facilities) (€)", 60.00)
 
+
+
+# ================================================================
+# SESSION MODE EVENT POPUP LOGIC
+# ================================================================
+import random
+
+selected_events = []
+
+if mode == "Session Mode":
+
+    st.subheader("🎮 Scenario-Based Session")
+
+    # step progression
+    # 0 → no event
+    # 1 → 1 random event
+    # 2 → 2 random events
+    # 3 → 3 random events
+
+    if st.button("Start / Continue Session"):
+
+        if st.session_state.session_step == 0:
+            st.info("Today is a normal day. No disruptions.")
+            st.session_state.session_step = 1
+
+        elif st.session_state.session_step == 1:
+            chosen = random.sample(list(EVENTS.keys()), 1)
+            st.session_state.active_events = chosen
+            st.session_state.session_step = 2
+
+        elif st.session_state.session_step == 2:
+            chosen = random.sample(list(EVENTS.keys()), 2)
+            st.session_state.active_events = chosen
+            st.session_state.session_step = 3
+
+        elif st.session_state.session_step == 3:
+            chosen = random.sample(list(EVENTS.keys()), 3)
+            st.session_state.active_events = chosen
+            st.session_state.session_step = 4
+
+        else:
+            st.success("🎉 Session finished — all disruption levels tested!")
+    
+    # Display event pop-ups if assigned
+    if "active_events" in st.session_state:
+        st.subheader("⚠️ Active Scenario Events")
+
+        for e in st.session_state.active_events:
+            st.warning(EVENTS[e])
+
+        st.write("👉 Comment below: What decisions would you take and why?")
+        st.text_area("Your comment:")
+
+    # Map active events → boolean flags for optimization
+    suez_flag = "suez_canal" in st.session_state.get("active_events", [])
+    oil_flag = "oil_crises" in st.session_state.get("active_events", [])
+    volcano_flag = "volcano" in st.session_state.get("active_events", [])
+    trade_flag = "trade_war" in st.session_state.get("active_events", [])
+else:
+    # Normal mode → no event flags
+    suez_flag = False
+    oil_flag = False
+    volcano_flag = False
+    trade_flag = False
+
+
+
 # ================================================================
 # ▶️ Run Optimization
 # ================================================================
+
+
 if st.button("Run Optimization"):
     with st.spinner("Running Gurobi optimization... Please wait ⏳"):
         try:
@@ -168,8 +257,13 @@ if st.button("Run Optimization"):
                     CO_2_percentage=co2_pct,
                     product_weight=product_weight,
                     co2_cost_per_ton_New=co2_cost_per_ton_New,
-                    print_results="NO"
+                    print_results="NO",
+                    suez_canal=suez_flag,
+                    oil_crises=oil_flag,
+                    volcano=volcano_flag,
+                    trade_war=trade_flag
                 )
+
 
             st.success("Optimization completed successfully ✅")
 
