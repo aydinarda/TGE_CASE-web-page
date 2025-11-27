@@ -50,8 +50,8 @@ components.html(f"""
 # 🧩 Safe Imports
 # ================================================================
 try:
-    from SC1F import run_scenario as Scenario_Setting_For_SC1F
-    from SC2F import run_scenario as Scenario_Setting_For_SC2F
+    from Scenario_Setting_For_SC1F import run_scenario as run_SC1F
+    from Scenario_Setting_For_SC1F import run_scenario as run_SC2F
 except Exception as e:
     st.error(f"❌ Error importing optimization modules: {e}")
 
