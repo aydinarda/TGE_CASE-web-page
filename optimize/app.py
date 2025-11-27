@@ -177,63 +177,67 @@ elif "SC2F" in model_choice:
 # ================================================================
 import random
 
-selected_events = []
+def generate_tariff_rate():
+    k = random.uniform(1, 2)   # Float between 1 and 2
+    x_pct = ((k - 1) / k) * 100
+    return k, x_pct
+
+
+# ================================================================
+# SESSION MODE EVENT POPUP LOGIC (ONE RANDOM EVENT EACH STEP)
+# ================================================================
+selected_event = None
+tariff_rate_random = 1.0
+tariff_x_pct = 0.0
 
 if mode == "Session Mode":
 
     st.subheader("🎮 Scenario-Based Session")
 
-    # step progression
-    # 0 → no event
-    # 1 → 1 random event
-    # 2 → 2 random events
-    # 3 → 3 random events
+    # Initialize event list only once
+    if "remaining_events" not in st.session_state:
+        st.session_state.remaining_events = list(EVENTS.keys())
 
     if st.button("Start / Continue Session"):
 
-        if st.session_state.session_step == 0:
-            st.info("Today is a normal day. No disruptions.")
-            st.session_state.session_step = 1
-
-        elif st.session_state.session_step == 1:
-            chosen = random.sample(list(EVENTS.keys()), 1)
-            st.session_state.active_events = chosen
-            st.session_state.session_step = 2
-
-        elif st.session_state.session_step == 2:
-            chosen = random.sample(list(EVENTS.keys()), 2)
-            st.session_state.active_events = chosen
-            st.session_state.session_step = 3
-
-        elif st.session_state.session_step == 3:
-            chosen = random.sample(list(EVENTS.keys()), 3)
-            st.session_state.active_events = chosen
-            st.session_state.session_step = 4
-
+        # If finished all events
+        if len(st.session_state.remaining_events) == 0:
+            st.success("🎉 All scenarios have now been tested! Session complete.")
         else:
-            st.success("🎉 Session finished — all disruption levels tested!")
-    
-    # Display event pop-ups if assigned
-    if "active_events" in st.session_state:
-        st.subheader("⚠️ Active Scenario Events")
+            # Choose 1 event at random and remove it
+            chosen = random.choice(st.session_state.remaining_events)
+            st.session_state.remaining_events.remove(chosen)
+            st.session_state.active_event = chosen
 
-        for e in st.session_state.active_events:
-            st.warning(EVENTS[e])
+            # Special handling for trade war (random tariff_rate)
+            if chosen == "trade_war":
+                k, x_pct = generate_tariff_rate()
+                st.session_state.tariff_rate_random = k
+                st.session_state.tariff_x_pct = x_pct
 
-        st.write("👉 Comment below: What decisions would you take and why?")
+    # Display event (if exists)
+    if "active_event" in st.session_state:
+        e = st.session_state.active_event
+        st.subheader("⚠️ Active Event")
+        st.warning(EVENTS[e])
+
+        if e == "trade_war":
+            st.info(f"Tariffs are now **{st.session_state.tariff_x_pct:.1f}%** more.")
+
+        st.write("👉 Comment below: What would be the optimal choice?")
         st.text_area("Your comment:")
 
-    # Map active events → boolean flags for optimization
-    suez_flag = "suez_canal" in st.session_state.get("active_events", [])
-    oil_flag = "oil_crises" in st.session_state.get("active_events", [])
-    volcano_flag = "volcano" in st.session_state.get("active_events", [])
-    trade_flag = "trade_war" in st.session_state.get("active_events", [])
+    # Map event flag
+    suez_flag = (st.session_state.get("active_event") == "suez_canal")
+    oil_flag = (st.session_state.get("active_event") == "oil_crises")
+    volcano_flag = (st.session_state.get("active_event") == "volcano")
+    trade_flag = (st.session_state.get("active_event") == "trade_war")
+    tariff_rate_used = st.session_state.get("tariff_rate_random", 1.0)
+
 else:
-    # Normal mode → no event flags
-    suez_flag = False
-    oil_flag = False
-    volcano_flag = False
-    trade_flag = False
+    # Normal mode
+    suez_flag = oil_flag = volcano_flag = trade_flag = False
+    tariff_rate_used = 1.0
 
 
 
@@ -250,7 +254,12 @@ if st.button("Run Optimization"):
                     CO_2_percentage=co2_pct,
                     product_weight=product_weight,
                     co2_cost_per_ton=co2_cost_per_ton,
-                    print_results="NO"
+                    print_results="NO",
+                    suez_canal=suez_flag,
+                    oil_crises=oil_flag,
+                    volcano=volcano_flag,
+                    trade_war=trade_flag,
+                    tariff_rate=tariff_rate_used
                 )
             else:
                 results, model = run_SC2F(
@@ -261,7 +270,8 @@ if st.button("Run Optimization"):
                     suez_canal=suez_flag,
                     oil_crises=oil_flag,
                     volcano=volcano_flag,
-                    trade_war=trade_flag
+                    trade_war=trade_flag,
+                    tariff_rate=tariff_rate_used
                 )
 
 
