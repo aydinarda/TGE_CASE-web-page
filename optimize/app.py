@@ -4,7 +4,9 @@ import gurobipy as gp
 import streamlit.components.v1 as components
 import plotly.express as px
 import pandas as pd
-
+import pandas as pd
+import reverse_geocode  # pip install reverse_geocode
+import plotly.express as px
 
 
 
@@ -293,43 +295,42 @@ if st.button("Run Optimization"):
                 "Total": round(results.get("CO2_Total", 0), 2),
             })
             
-            # ================================================================
-            # 🌍 GLOBAL SUPPLY CHAIN NETWORK MAP (copied from SC2 dashboard)
-            # ================================================================
-            import plotly.express as px
-            import pandas as pd
+                        
+            st.markdown("## 🌍 Global Supply Chain Structure (with City Names)")
             
-            st.markdown("## 🌍 Global Supply Chain Structure")
+            def get_place_name(lat, lon):
+                # reverse_geocode expects (lat, lon) tuple
+                result = reverse_geocode.search([(lat, lon)])[0]
+                city = result.get("name")
+                region = result.get("admin1")
+                country = result.get("cc")
+                return f"{city}, {region}, {country}"
             
-            # --- Plants (f1, China region) ---
-            plants = pd.DataFrame({
-                "Type": ["Plant", "Plant"],
-                "Lat": [31.23, 22.32],        # Shanghai & Southern China
-                "Lon": [121.47, 114.17]
-            })
+            # Build data for all known nodes
+            data = []
+            # plants
+            for lat, lon in [(31.23, 121.47), (22.32, 114.17)]:
+                data.append({"Lat": lat, "Lon": lon, "Type": "Plant",
+                             "Place": get_place_name(lat, lon)})
             
-            # --- Cross-docks (f2) ---
-            crossdocks = pd.DataFrame({
-                "Type": ["Cross-dock"] * 3,
-                "Lat": [48.85, 50.11, 37.98],   # France, Germany, Greece
-                "Lon": [2.35, 8.68, 23.73]
-            })
+            # cross-docks
+            for lat, lon in [(48.85, 2.35), (50.11, 8.68), (37.98, 23.73)]:
+                data.append({"Lat": lat, "Lon": lon, "Type": "Cross-dock",
+                             "Place": get_place_name(lat, lon)})
             
-            # --- Distribution Centres (DCs) ---
-            dcs = pd.DataFrame({
-                "Type": ["Distribution Centre"] * 4,
-                "Lat": [47.50, 48.14, 46.95, 45.46],
-                "Lon": [19.04, 11.58, 7.44, 9.19]
-            })
+            # DCs
+            for lat, lon in [(47.50, 19.04), (48.14, 11.58), (46.95, 7.44), (45.46, 9.19)]:
+                data.append({"Lat": lat, "Lon": lon, "Type": "Distribution Centre",
+                             "Place": get_place_name(lat, lon)})
             
-            # --- Retailer Hubs (f3) ---
-            retailers = pd.DataFrame({
-                "Type": ["Retailer Hub"] * 7,
-                "Lat": [55.67, 53.35, 51.50, 49.82, 45.76, 43.30, 40.42],
-                "Lon": [12.57, -6.26, -0.12, 19.08, 4.83, 5.37, -3.70]
-            })
+            # Retailer hubs
+            retailer_coords = [(55.67, 12.57), (53.35, -6.26), (51.50, -0.12),
+                               (49.82, 19.08), (45.76, 4.83), (43.30, 5.37), (40.42, -3.70)]
+            for lat, lon in retailer_coords:
+                data.append({"Lat": lat, "Lon": lon, "Type": "Retailer Hub",
+                             "Place": get_place_name(lat, lon)})
             
-            # --- Detect new facilities from f2_2_bin variables ---
+            # New facilities (only those active)
             facility_coords = {
                 "HUDTG": (49.61, 6.13),
                 "CZMCT": (44.83, 20.42),
@@ -337,31 +338,15 @@ if st.button("Run Optimization"):
                 "FIMPF": (50.45, 14.50),
                 "PLZCA": (42.70, 12.65)
             }
+            for name, (lat, lon) in facility_coords.items():
+                var_name = f"f2_2_bin[{name}]"
+                var = model.getVarByName(var_name)
+                if var is not None and var.X > 0.5:
+                    data.append({"Lat": lat, "Lon": lon, "Type": "New Production Facility",
+                                 "Place": get_place_name(lat, lon)})
             
-            active_facilities = []
+            locations = pd.DataFrame(data)
             
-            for var in model.getVars():
-                if var.VarName.startswith("f2_2_bin") and var.X > 0.5:
-                    # extract name inside brackets
-                    name = var.VarName[var.VarName.find("[")+1 : var.VarName.find("]")]
-                    if name in facility_coords:
-                        lat, lon = facility_coords[name]
-                        active_facilities.append((name, lat, lon))
-            
-            if active_facilities:
-                new_facilities = pd.DataFrame({
-                    "Type": "New Production Facility",
-                    "Lat": [lat for _, lat, _ in active_facilities],
-                    "Lon": [lon for _, _, lon in active_facilities],
-                    "Name": [name for name, _, _ in active_facilities]
-                })
-            else:
-                new_facilities = pd.DataFrame(columns=["Type", "Lat", "Lon", "Name"])
-            
-            # --- Combine all locations ---
-            locations = pd.concat([plants, crossdocks, dcs, retailers, new_facilities])
-            
-            # --- Color and size mapping ---
             color_map = {
                 "Plant": "purple",
                 "Cross-dock": "dodgerblue",
@@ -369,7 +354,6 @@ if st.button("Run Optimization"):
                 "Retailer Hub": "red",
                 "New Production Facility": "deepskyblue"
             }
-            
             size_map = {
                 "Plant": 15,
                 "Cross-dock": 14,
@@ -378,21 +362,22 @@ if st.button("Run Optimization"):
                 "New Production Facility": 14
             }
             
-            # --- Build map ---
             fig_map = px.scatter_geo(
                 locations,
                 lat="Lat",
                 lon="Lon",
                 color="Type",
+                text="Place",              # show city/place name
+                hover_name="Place",
                 color_discrete_map=color_map,
                 projection="natural earth",
                 scope="world",
                 title="Global Supply Chain Structure"
             )
             
-            # Customize
             for trace in fig_map.data:
-                trace.marker.update(size=size_map[trace.name], opacity=0.9, line=dict(width=0.5, color='white'))
+                trace.marker.update(size=size_map.get(trace.name, 12), opacity=0.9,
+                                    line=dict(width=0.5, color='white'))
             
             fig_map.update_geos(
                 showcountries=True,
@@ -401,19 +386,12 @@ if st.button("Run Optimization"):
                 landcolor="rgb(245,245,245)",
                 fitbounds="locations"
             )
-            fig_map.update_layout(height=550, margin=dict(l=0, r=0, t=40, b=0))
+            fig_map.update_layout(height=600, margin=dict(l=0, r=0, t=40, b=0))
             
             st.plotly_chart(fig_map, use_container_width=True)
+                        
+                        
             
-            # Optional legend
-            st.markdown("""
-            **Legend:**
-            - 🏗️ **Cross-dock**  
-            - 🏬 **Distribution Centre**  
-            - 🔴 **Retailer Hub**  
-            - ⚙️ **New Production Facility**  
-            - 🏭 **Plant**
-            """)
             
             # ================================================================
             # 🚚 TRANSPORT FLOWS BY MODE (L1, L2, L2_2, L3)
