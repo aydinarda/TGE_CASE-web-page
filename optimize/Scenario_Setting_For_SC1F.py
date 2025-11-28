@@ -55,7 +55,8 @@ def run_scenario(
     oil_crises = False,
     volcano = False,
     trade_war = False,
-    tariff_rate=1
+    tariff_rate=1,
+    service_level=0.9
 ):
     # =====================================================
     # DEFAULT DATA (filled from original SC2)
@@ -108,7 +109,7 @@ def run_scenario(
     if co2_emission_factor is None:
         co2_emission_factor = {"air": 0.000971, "sea": 0.000027, "road": 0.000076}
     
-    service_level = {'air': 0.9, 'sea': 0.9, 'road': 0.9}
+    service_level = {'air': service_level, 'sea': service_level, 'road': service_level}
     average_distance = 9600
     speed = {'air': 800, 'sea': 10, 'road': 40}
     std_demand = np.std(list(demand.values()))

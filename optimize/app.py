@@ -168,7 +168,7 @@ def run_optimization_dashboard():
     st.subheader("📊 Scenario Parameters")
     
     co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100.0
-    product_weight = positive_input("Product Weight (kg)", 2.58)
+    sourcing_cost = positive_input("Sourcing Cost (€/unit)", 0.0)    
     
     if "SC1F" in model_choice:
         st.subheader("⚙️ Parameters for SC1F (Existing Facilities)")
@@ -260,26 +260,25 @@ def run_optimization_dashboard():
                 if "SC1F" in model_choice:
                     results, model = run_SC1F(
                         CO_2_percentage=co2_pct,
-                        product_weight=product_weight,
                         co2_cost_per_ton=co2_cost_per_ton,
                         print_results="NO",
                         suez_canal=suez_flag,
                         oil_crises=oil_flag,
                         volcano=volcano_flag,
                         trade_war=trade_flag,
-                        tariff_rate=tariff_rate_used
+                        tariff_rate=tariff_rate_used,
+                        sourcing_cost=sourcing_cost
                     )
                 else:
                     results, model = run_SC2F(
                         CO_2_percentage=co2_pct,
-                        product_weight=product_weight,
                         co2_cost_per_ton_New=co2_cost_per_ton_New,
                         print_results="NO",
                         suez_canal=suez_flag,
                         oil_crises=oil_flag,
                         volcano=volcano_flag,
                         trade_war=trade_flag,
-                        tariff_rate=tariff_rate_used
+                        sourcing_cost=sourcing_cost
                     )
     
     
