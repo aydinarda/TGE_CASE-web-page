@@ -415,6 +415,55 @@ if st.button("Run Optimization"):
             - 🏭 **Plant**
             """)
             
+            # ================================================================
+            # 🚚 TRANSPORT FLOWS BY MODE (L1, L2, L2_2, L3)
+            # ================================================================
+            st.markdown("## 🚚 Transport Flows by Mode")
+            
+            import re
+            
+            def sum_flows_by_mode(model, prefix):
+                """Calculate total air/sea/road flows for variables starting with prefix (f1, f2, f2_2, f3)."""
+                totals = {"air": 0.0, "sea": 0.0, "road": 0.0}
+            
+                for var in model.getVars():
+                    vname = var.VarName
+                    if vname.startswith(prefix + "["):
+                        # extract mode from final argument inside brackets
+                        match = re.search(r",\s*([a-zA-Z]+)\]$", vname)
+                        if match:
+                            mode = match.group(1).lower()
+                            if mode in totals:
+                                try:
+                                    totals[mode] += float(var.X)
+                                except:
+                                    pass
+                return totals
+            
+            
+            def display_layer(title, prefix, include_road=True):
+                totals = sum_flows_by_mode(model, prefix)
+                st.markdown(f"### {title}")
+                cols = st.columns(3 if include_road else 2)
+            
+                cols[0].metric("🚢 Sea", f"{totals['sea']:,.0f} units")
+                cols[1].metric("✈️ Air", f"{totals['air']:,.0f} units")
+                if include_road:
+                    cols[2].metric("🚛 Road", f"{totals['road']:,.0f} units")
+            
+                if sum(totals.values()) == 0:
+                    st.info("No transport activity recorded for this layer.")
+                st.markdown("---")
+            
+            
+            # Display all layers
+            display_layer("Layer 1: Plants → Cross-docks", "f1", include_road=False)
+            display_layer("Layer 2a: Cross-docks → DCs", "f2", include_road=True)
+            display_layer("Layer 2b: New Facilities → DCs", "f2_2", include_road=True)
+            display_layer("Layer 3: DCs → Retailer Hubs", "f3", include_road=True)
+
+            
+            
             
             # ================================================================
             # 💰 COST DISTRIBUTION BAR CHART
@@ -492,9 +541,7 @@ if st.button("Run Optimization"):
             with col2:
                 st.subheader("Emission Distribution")
             
-                import plotly.express as px
-                import pandas as pd
-            
+                
                 # Extract emission components
                 E_air = results.get("E_air", 0)
                 E_sea = results.get("E_sea", 0)
