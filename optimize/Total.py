@@ -294,6 +294,226 @@ if st.button("Run Optimization"):
                 scope="world",
             )
             st.plotly_chart(fig_map, use_container_width=True)
+            
+            # ================================================================
+            # 🌍 FULL GLOBAL MAP (with new facilities + events)
+            # ================================================================
+            
+            # New facilities (only if active)
+            facility_coords = {
+                "HUDTG": (49.61, 6.13, "Luxembourg"),
+                "CZMCT": (44.83, 20.42, "Belgrade"),
+                "IEILG": (47.09, 16.37, "Graz"),
+                "FIMPF": (50.45, 14.50, "Prague"),
+                "PLZCA": (42.70, 12.65, "Viterbo"),
+            }
+            
+            for name, (lat, lon, city) in facility_coords.items():
+                var = model.getVarByName(f"f2_2_bin[{name}]")
+                if var is not None and var.X > 0.5:
+                    nodes.append(("New Production Facility", lat, lon, city))
+            
+            # Build DataFrame
+            locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+            
+            # ================================================================
+            # Add EVENT MARKERS to the map
+            # ================================================================
+            event_nodes = []
+            
+            if suez_flag:
+                event_nodes.append(("Event: Suez Canal Blockade", 30.59, 32.27, "Suez Canal Crisis"))
+            
+            if volcano_flag:
+                event_nodes.append(("Event: Volcano Eruption", 63.63, -19.62, "Volcanic Ash Zone"))
+            
+            if oil_flag:
+                event_nodes.append(("Event: Oil Crisis", 28.60, 47.80, "Oil Supply Shock"))
+            
+            if trade_flag:
+                event_nodes.append(("Event: Trade War", 55.00, 60.00, "Trade War Impact Zone"))
+            
+            if event_nodes:
+                df_events = pd.DataFrame(event_nodes, columns=["Type", "Lat", "Lon", "City"])
+                locations = pd.concat([locations, df_events], ignore_index=True)
+            
+            # ================================================================
+            # Marker colors & sizes
+            # ================================================================
+            color_map = {
+                "Plant": "purple",
+                "Cross-dock": "dodgerblue",
+                "Distribution Centre": "black",
+                "Retailer Hub": "red",
+                "New Production Facility": "deepskyblue",
+            }
+            
+            color_map.update({
+                "Event: Suez Canal Blockade": "gold",
+                "Event: Volcano Eruption": "orange",
+                "Event: Oil Crisis": "brown",
+                "Event: Trade War": "green",
+            })
+            
+            size_map = {
+                "Plant": 15,
+                "Cross-dock": 14,
+                "Distribution Centre": 16,
+                "Retailer Hub": 20,
+                "New Production Facility": 14,
+            }
+            
+            size_map.update({
+                "Event: Suez Canal Blockade": 18,
+                "Event: Volcano Eruption": 18,
+                "Event: Oil Crisis": 18,
+                "Event: Trade War": 18,
+            })
+            
+            # ================================================================
+            # Build MAP
+            # ================================================================
+            fig_map = px.scatter_geo(
+                locations,
+                lat="Lat",
+                lon="Lon",
+                color="Type",
+                text="City",
+                hover_name="City",
+                color_discrete_map=color_map,
+                projection="natural earth",
+                scope="world",
+                title="Global Supply Chain Structure",
+            )
+            
+            # marker styling
+            for trace in fig_map.data:
+                trace.marker.update(
+                    size=size_map.get(trace.name, 12),
+                    opacity=0.9,
+                    line=dict(width=0.5, color="white"),
+                )
+            
+            fig_map.update_geos(
+                showcountries=True,
+                countrycolor="lightgray",
+                showland=True,
+                landcolor="rgb(245,245,245)",
+                fitbounds="locations",
+            )
+            
+            fig_map.update_layout(
+                height=600,
+                margin=dict(l=0, r=0, t=40, b=0),
+            )
+            
+            st.plotly_chart(fig_map, use_container_width=True)
+            
+            
+            
+            # ================================================================
+            # 🏭 PRODUCTION OUTBOUND PIE CHART
+            # ================================================================
+            st.markdown("## 🏭 Production Outbound Breakdown")
+            
+            TOTAL_MARKET_DEMAND = 111000
+            
+            f1_vars = [v for v in model.getVars() if v.VarName.startswith("f1[")]
+            f2_2_vars = [v for v in model.getVars() if v.VarName.startswith("f2_2[")]
+            
+            prod_sources = {}
+            
+            # Existing plants
+            for plant in ["TW", "SHA"]:
+                total = sum(v.X for v in f1_vars if v.VarName.startswith(f"f1[{plant},"))
+                prod_sources[plant] = total
+            
+            # New EU facilities
+            for fac in ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]:
+                total = sum(v.X for v in f2_2_vars if v.VarName.startswith(f"f2_2[{fac},"))
+                prod_sources[fac] = total
+            
+            total_produced = sum(prod_sources.values())
+            unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
+            
+            labels = list(prod_sources.keys()) + ["Unmet Demand"]
+            values = list(prod_sources.values()) + [unmet]
+            
+            df_prod = pd.DataFrame({"Source": labels, "Units Produced": values})
+            
+            fig_prod = px.pie(
+                df_prod,
+                names="Source",
+                values="Units Produced",
+                hole=0.3,
+                title="Production Share by Source",
+            )
+            
+            color_map = {name: col for name, col in zip(df_prod["Source"], px.colors.qualitative.Set2)}
+            color_map["Unmet Demand"] = "lightgrey"
+            
+            fig_prod.update_traces(
+                textinfo="label+percent",
+                textfont_size=13,
+                marker=dict(colors=[color_map[s] for s in df_prod["Source"]])
+            )
+            
+            fig_prod.update_layout(
+                showlegend=True,
+                height=400,
+                template="plotly_white",
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            
+            st.plotly_chart(fig_prod, use_container_width=True)
+            st.markdown("#### 📦 Production Summary Table")
+            st.dataframe(df_prod.round(2), use_container_width=True)
+            
+            
+            
+            # ================================================================
+            # 🚚 CROSS-DOCK OUTBOUND PIE CHART
+            # ================================================================
+            st.markdown("## 🚚 Cross-dock Outbound Breakdown")
+            
+            f2_vars = [v for v in model.getVars() if v.VarName.startswith("f2[")]
+            
+            crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
+            crossdock_flows = {}
+            
+            for cd in crossdocks:
+                total = sum(v.X for v in f2_vars if v.VarName.startswith(f"f2[{cd},"))
+                crossdock_flows[cd] = total
+            
+            if sum(crossdock_flows.values()) == 0:
+                st.info("No cross-dock activity.")
+            else:
+                df_crossdock = pd.DataFrame({
+                    "Crossdock": list(crossdock_flows.keys()),
+                    "Shipped (units)": list(crossdock_flows.values()),
+                })
+                df_crossdock["Share (%)"] = df_crossdock["Shipped (units)"] / df_crossdock["Shipped (units)"].sum() * 100
+            
+                fig_crossdock = px.pie(
+                    df_crossdock,
+                    names="Crossdock",
+                    values="Shipped (units)",
+                    hole=0.3,
+                    title="Cross-dock Outbound Share"
+                )
+            
+                fig_crossdock.update_layout(
+                    showlegend=True,
+                    height=400,
+                    template="plotly_white",
+                    margin=dict(l=20, r=20, t=40, b=20),
+                )
+            
+                st.plotly_chart(fig_crossdock, use_container_width=True)
+            
+                st.markdown("#### 🚚 Cross-dock Outbound Table")
+                st.dataframe(df_crossdock.round(2), use_container_width=True)
+
 
         except Exception as e:
             st.error(f"❌ Error in optimization: {e}")
