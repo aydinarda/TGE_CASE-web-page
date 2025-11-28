@@ -168,7 +168,7 @@ def run_optimization_dashboard():
     st.subheader("📊 Scenario Parameters")
     
     co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100.0
-    sourcing_cost = positive_input("Sourcing Cost (€/unit)", 0.0)    
+    service_level = positive_input("Sourcing Cost (€/unit)", 0.9)    
     
     if "SC1F" in model_choice:
         st.subheader("⚙️ Parameters for SC1F (Existing Facilities)")
@@ -267,7 +267,7 @@ def run_optimization_dashboard():
                         volcano=volcano_flag,
                         trade_war=trade_flag,
                         tariff_rate=tariff_rate_used,
-                        sourcing_cost=sourcing_cost
+                        service_level=service_level
                     )
                 else:
                     results, model = run_SC2F(
@@ -278,7 +278,7 @@ def run_optimization_dashboard():
                         oil_crises=oil_flag,
                         volcano=volcano_flag,
                         trade_war=trade_flag,
-                        sourcing_cost=sourcing_cost
+                        service_level=service_level
                     )
     
     
