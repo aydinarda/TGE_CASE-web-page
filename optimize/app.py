@@ -338,6 +338,30 @@ if st.button("Run Optimization"):
             
             # Build DataFrame
             locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+            # ================================================================
+            # Add EVENT MARKERS to the map
+            # ================================================================
+            event_nodes = []
+            
+            if suez_flag:
+                event_nodes.append(("Event: Suez Canal Blockade", 30.59, 32.27, "Suez Canal Crisis"))
+            
+            if volcano_flag:
+                event_nodes.append(("Event: Volcano Eruption", 63.63, -19.62, "Volcanic Ash Zone"))
+            
+            if oil_flag:
+                event_nodes.append(("Event: Oil Crisis", 28.60, 47.80, "Oil Supply Shock"))
+            
+            if trade_flag:
+                event_nodes.append(("Event: Trade War", 55.00, 60.00, "Trade War Impact Zone"))
+            
+            # Convert to DataFrame if not empty
+            if event_nodes:
+                df_events = pd.DataFrame(event_nodes, columns=["Type", "Lat", "Lon", "City"])
+                locations = pd.concat([locations, df_events], ignore_index=True)
+                
+                
+
             
             # Colors & sizes
             color_map = {
@@ -347,6 +371,15 @@ if st.button("Run Optimization"):
                 "Retailer Hub": "red",
                 "New Production Facility": "deepskyblue",
             }
+            
+            color_map.update({
+                    "Event: Suez Canal Blockade": "gold",
+                    "Event: Volcano Eruption": "orange",
+                    "Event: Oil Crisis": "brown",
+                    "Event: Trade War": "green",
+                })
+
+            
             size_map = {
                 "Plant": 15,
                 "Cross-dock": 14,
@@ -354,6 +387,14 @@ if st.button("Run Optimization"):
                 "Retailer Hub": 20,
                 "New Production Facility": 14,
             }
+            
+            size_map.update({
+                "Event: Suez Canal Blockade": 18,
+                "Event: Volcano Eruption": 18,
+                "Event: Oil Crisis": 18,
+                "Event: Trade War": 18,
+            })
+
             
             # Build map
             fig_map = px.scatter_geo(
