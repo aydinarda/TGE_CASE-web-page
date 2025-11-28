@@ -505,4 +505,35 @@ if st.button("Run Optimization"):
 
 
         except Exception as e:
-            st.error(f"❌ Error in optimization: {e}")
+            st.error(f"❌ Primary optimization failed: {e}")
+            st.warning("⚠ Running fallback model to compute maximum satisfiable demand...")
+        
+            try:
+                # Fallback unsatisfied-demand model
+                from Scenario_Setting_For_SC2F_uns import run_scenario as run_S2Uns
+        
+                results_uns, model_uns = run_S2Uns(
+                    CO_2_percentage=co2_pct,
+                    co2_cost_per_ton_New=co2_cost_per_ton_New
+                    if "SC2F" in model_choice else co2_cost_per_ton,
+                    suez_canal=suez_flag,
+                    oil_crises=oil_flag,
+                    volcano=volcano_flag,
+                    trade_war=trade_flag,
+                    tariff_rate=tariff_rate_used,
+                    print_results="NO"
+                )
+        
+                st.success("Fallback optimization successful! ✅")
+                st.metric(
+                    "📦 Maximum Satisfiable Demand (%)",
+                    f"{results_uns['Satisfied_Demand_pct']*100:.2f}%"
+                )
+                st.metric(
+                    "📦 Maximum Satisfiable Demand (Units)",
+                    f"{results_uns['Satisfied_Demand_units']:,.0f}"
+                )
+        
+            except Exception as e2:
+                st.error(f"❌ Fallback model also failed: {e2}")
+
