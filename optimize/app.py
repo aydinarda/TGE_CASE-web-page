@@ -4,9 +4,6 @@ import gurobipy as gp
 import streamlit.components.v1 as components
 import plotly.express as px
 import pandas as pd
-import pandas as pd
-from geopy.geocoders import Nominatim
-import plotly.express as px
 
 
 
@@ -296,95 +293,66 @@ if st.button("Run Optimization"):
             })
             
                         
-            
-            st.markdown("## 🌍 Global Supply Chain Structure (with City Names)")
+            st.markdown("## 🌍 Global Supply Chain Map (with City Labels)")
 
-            # Initialize geocoder
-            geolocator = Nominatim(user_agent="sc_map_app", timeout=10)
+            # Static locations with city names
+            nodes = [
+                # Plants
+                ("Plant", 31.23, 121.47, "Shanghai"),
+                ("Plant", 22.32, 114.17, "Hong Kong"),
             
-            def get_city_name(lat, lon):
-                try:
-                    location = geolocator.reverse((lat, lon), language="en")
-                    if location is None:
-                        return "Unknown"
-                    
-                    address = location.raw.get("address", {})
-                    # Try to extract meaningful name in order of reliability
-                    return (
-                        address.get("city") or
-                        address.get("town") or
-                        address.get("village") or
-                        address.get("municipality") or
-                        address.get("state") or
-                        address.get("county") or
-                        address.get("country") or
-                        "Unknown"
-                    )
-                except:
-                    return "Unknown"
+                # Cross-docks
+                ("Cross-dock", 48.85, 2.35, "Paris"),
+                ("Cross-dock", 50.11, 8.68, "Frankfurt"),
+                ("Cross-dock", 37.98, 23.73, "Athens"),
             
-            # Build table of all nodes
-            data = []
+                # Distribution Centres
+                ("Distribution Centre", 47.50, 19.04, "Budapest"),
+                ("Distribution Centre", 48.14, 11.58, "Munich"),
+                ("Distribution Centre", 46.95, 7.44, "Bern"),
+                ("Distribution Centre", 45.46, 9.19, "Milan"),
             
-            def add_point(lat, lon, Type):
-                city = get_city_name(lat, lon)
-                data.append({"Lat": lat, "Lon": lon, "Type": Type, "City": city})
-            
-            # Plants
-            add_point(31.23, 121.47, "Plant")
-            add_point(22.32, 114.17, "Plant")
-            
-            # Cross-docks
-            add_point(48.85, 2.35, "Cross-dock")
-            add_point(50.11, 8.68, "Cross-dock")
-            add_point(37.98, 23.73, "Cross-dock")
-            
-            # DCs
-            add_point(47.50, 19.04, "Distribution Centre")
-            add_point(48.14, 11.58, "Distribution Centre")
-            add_point(46.95, 7.44, "Distribution Centre")
-            add_point(45.46, 9.19, "Distribution Centre")
-            
-            # Retailers
-            retail_coords = [
-                (55.67, 12.57), (53.35, -6.26), (51.50, -0.12),
-                (49.82, 19.08), (45.76, 4.83), (43.30, 5.37),
-                (40.42, -3.70)
+                # Retailers
+                ("Retailer Hub", 55.67, 12.57, "Copenhagen"),
+                ("Retailer Hub", 53.35, -6.26, "Dublin"),
+                ("Retailer Hub", 51.50, -0.12, "London"),
+                ("Retailer Hub", 49.82, 19.08, "Krakow"),
+                ("Retailer Hub", 45.76, 4.83, "Lyon"),
+                ("Retailer Hub", 43.30, 5.37, "Marseille"),
+                ("Retailer Hub", 40.42, -3.70, "Madrid"),
             ]
-            for lat, lon in retail_coords:
-                add_point(lat, lon, "Retailer Hub")
             
-            # New Facilities (active only)
+            # New facilities (only if active)
             facility_coords = {
-                "HUDTG": (49.61, 6.13),
-                "CZMCT": (44.83, 20.42),
-                "IEILG": (47.09, 16.37),
-                "FIMPF": (50.45, 14.50),
-                "PLZCA": (42.70, 12.65)
+                "HUDTG": (49.61, 6.13, "Luxembourg"),
+                "CZMCT": (44.83, 20.42, "Belgrade"),
+                "IEILG": (47.09, 16.37, "Graz"),
+                "FIMPF": (50.45, 14.50, "Prague"),
+                "PLZCA": (42.70, 12.65, "Viterbo"),
             }
-            for name, (lat, lon) in facility_coords.items():
-                var_name = f"f2_2_bin[{name}]"
-                var = model.getVarByName(var_name)
+            
+            for name, (lat, lon, city) in facility_coords.items():
+                var = model.getVarByName(f"f2_2_bin[{name}]")
                 if var is not None and var.X > 0.5:
-                    add_point(lat, lon, "New Production Facility")
+                    nodes.append(("New Production Facility", lat, lon, city))
             
-            locations = pd.DataFrame(data)
+            # Build DataFrame
+            locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
             
-            # Visual settings
+            # Colors & sizes
             color_map = {
                 "Plant": "purple",
                 "Cross-dock": "dodgerblue",
                 "Distribution Centre": "black",
                 "Retailer Hub": "red",
-                "New Production Facility": "deepskyblue"
+                "New Production Facility": "deepskyblue",
             }
-            
             size_map = {
                 "Plant": 15,
                 "Cross-dock": 14,
                 "Distribution Centre": 16,
                 "Retailer Hub": 20,
-                "New Production Facility": 14
+                "New Production Facility": 14,
             }
             
             # Build map
@@ -393,20 +361,20 @@ if st.button("Run Optimization"):
                 lat="Lat",
                 lon="Lon",
                 color="Type",
+                text="City",
                 hover_name="City",
-                text="City",  # label on map
                 color_discrete_map=color_map,
                 projection="natural earth",
                 scope="world",
-                title="Global Supply Chain Structure with City Labels"
+                title="Global Supply Chain Structure",
             )
             
-            # marker styles
+            # marker style
             for trace in fig_map.data:
                 trace.marker.update(
                     size=size_map.get(trace.name, 12),
                     opacity=0.9,
-                    line=dict(width=0.5, color='white')
+                    line=dict(width=0.5, color='white'),
                 )
             
             fig_map.update_geos(
@@ -414,15 +382,17 @@ if st.button("Run Optimization"):
                 countrycolor="lightgray",
                 showland=True,
                 landcolor="rgb(245,245,245)",
-                fitbounds="locations"
+                fitbounds="locations",
             )
             
             fig_map.update_layout(
                 height=600,
-                margin=dict(l=0, r=0, t=40, b=0)
+                margin=dict(l=0, r=0, t=40, b=0),
             )
             
             st.plotly_chart(fig_map, use_container_width=True)
+
+
                         
             
             
