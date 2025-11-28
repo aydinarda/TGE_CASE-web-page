@@ -221,7 +221,6 @@ if st.button("Run Optimization"):
             if "SC1F" in model_choice:
                 results, model = run_SC1F(
                     CO_2_percentage=co2_pct,
-                    sourcing_cost=sourcing_cost,
                     co2_cost_per_ton=co2_cost_per_ton,
                     suez_canal=suez_flag,
                     oil_crises=oil_flag,
@@ -233,7 +232,6 @@ if st.button("Run Optimization"):
             else:
                 results, model = run_SC2F(
                     CO_2_percentage=co2_pct,
-                    sourcing_cost=sourcing_cost,
                     co2_cost_per_ton_New=co2_cost_per_ton_New,
                     suez_canal=suez_flag,
                     oil_crises=oil_flag,
