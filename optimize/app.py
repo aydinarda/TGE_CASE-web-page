@@ -2,6 +2,8 @@ import os
 import streamlit as st
 import gurobipy as gp
 import streamlit.components.v1 as components
+import plotly.express as px
+import pandas as pd
 
 
 
@@ -417,75 +419,136 @@ if st.button("Run Optimization"):
             # ================================================================
             # 💰 COST DISTRIBUTION BAR CHART
             # ================================================================
-            st.markdown("## 💰 Cost Distribution")
+            st.markdown("## 💰 Cost and 🌿 Emission Distribution")
+            col1, col2 = st.columns(2)
             
-            import plotly.express as px
-            import pandas as pd
+            with col1:
+                st.subheader("Cost Distribution")
             
-            # Compute costs using the live optimization `results`
-            transport_cost = (
-                results.get("Transport_L1", 0)
-                + results.get("Transport_L2", 0)
-                + results.get("Transport_L2_new", 0)
-                + results.get("Transport_L3", 0)
-            )
+                import plotly.express as px
+                import pandas as pd
             
-            sourcing_handling_cost = (
-                results.get("Sourcing_L1", 0)
-                + results.get("Handling_L2_total", 0)
-                + results.get("Handling_L3", 0)
-            )
+                transport_cost = (
+                    results.get("Transport_L1", 0)
+                    + results.get("Transport_L2", 0)
+                    + results.get("Transport_L2_new", 0)
+                    + results.get("Transport_L3", 0)
+                )
             
-            co2_cost_production = (
-                results.get("CO2_Manufacturing_State1", 0)
-                + results.get("CO2_Cost_L2_2", 0)
-            )
+                sourcing_handling_cost = (
+                    results.get("Sourcing_L1", 0)
+                    + results.get("Handling_L2_total", 0)
+                    + results.get("Handling_L3", 0)
+                )
             
-            inventory_cost = (
-                results.get("Inventory_L1", 0)
-                + results.get("Inventory_L2", 0)
-                + results.get("Inventory_L2_new", 0)
-                + results.get("Inventory_L3", 0)
-            )
+                co2_cost_production = (
+                    results.get("CO2_Manufacturing_State1", 0)
+                    + results.get("CO2_Cost_L2_2", 0)
+                )
             
-            # Prepare for nice visualization
-            cost_parts = {
-                "Transportation Cost": transport_cost,
-                "Sourcing/Handling Cost": sourcing_handling_cost,
-                "CO₂ Cost in Production": co2_cost_production,
-                "Inventory Cost": inventory_cost,
-            }
+                inventory_cost = (
+                    results.get("Inventory_L1", 0)
+                    + results.get("Inventory_L2", 0)
+                    + results.get("Inventory_L2_new", 0)
+                    + results.get("Inventory_L3", 0)
+                )
             
-            df_cost_dist = pd.DataFrame({
-                "Category": list(cost_parts.keys()),
-                "Value": list(cost_parts.values())
-            })
+                cost_parts = {
+                    "Transportation Cost": transport_cost,
+                    "Sourcing/Handling Cost": sourcing_handling_cost,
+                    "CO₂ Cost in Production": co2_cost_production,
+                    "Inventory Cost": inventory_cost,
+                }
             
-            # Build Plotly bar chart
-            fig_cost = px.bar(
-                df_cost_dist,
-                x="Category",
-                y="Value",
-                text="Value",
-                color="Category",
-                color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"]
-            )
+                df_cost_dist = pd.DataFrame({
+                    "Category": list(cost_parts.keys()),
+                    "Value": list(cost_parts.values())
+                })
             
-            fig_cost.update_traces(
-                texttemplate="%{text:,.0f}",
-                textposition="outside"
-            )
+                fig_cost = px.bar(
+                    df_cost_dist,
+                    x="Category",
+                    y="Value",
+                    text="Value",
+                    color="Category",
+                    color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"]
+                )
             
-            fig_cost.update_layout(
-                template="plotly_white",
-                showlegend=False,
-                xaxis_tickangle=-35,
-                yaxis_title="€",
-                height=400,
-                yaxis_tickformat=","  # thousand separators
-            )
+                fig_cost.update_traces(
+                    texttemplate="%{text:,.0f}",
+                    textposition="outside"
+                )
+                fig_cost.update_layout(
+                    template="plotly_white",
+                    showlegend=False,
+                    xaxis_tickangle=-35,
+                    yaxis_title="€",
+                    height=400,
+                    yaxis_tickformat=","
+                )
             
-            st.plotly_chart(fig_cost, use_container_width=True)
+                st.plotly_chart(fig_cost, use_container_width=True)
+                
+            with col2:
+                st.subheader("Emission Distribution")
+            
+                import plotly.express as px
+                import pandas as pd
+            
+                # Extract emission components
+                E_air = results.get("E_air", 0)
+                E_sea = results.get("E_sea", 0)
+                E_road = results.get("E_road", 0)
+                E_lastmile = results.get("E_lastmile", 0)
+                E_production = results.get("E_production", 0)
+            
+                total_transport = E_air + E_sea + E_road
+            
+                emission_data = {
+                    "Production": E_production,
+                    "Last-mile": E_lastmile,
+                    "Air": E_air,
+                    "Sea": E_sea,
+                    "Road": E_road,
+                    "Total Transport": total_transport,
+                }
+            
+                df_emission = pd.DataFrame({
+                    "Source": list(emission_data.keys()),
+                    "Emission (tons)": list(emission_data.values())
+                })
+            
+                fig_emission = px.bar(
+                    df_emission,
+                    x="Source",
+                    y="Emission (tons)",
+                    text="Emission (tons)",
+                    color="Source",
+                    color_discrete_sequence=[
+                        "#4B8A08", "#2E8B57", "#808080",
+                        "#FFD700", "#90EE90", "#000000"
+                    ]
+                )
+            
+                fig_emission.update_traces(
+                    texttemplate="%{text:,.2f}",
+                    textposition="outside",
+                    marker_line_color="black",
+                    marker_line_width=0.5
+                )
+            
+                fig_emission.update_layout(
+                    template="plotly_white",
+                    showlegend=False,
+                    xaxis_tickangle=-35,
+                    yaxis_title="Tons of CO₂",
+                    height=400,
+                    yaxis_tickformat=","
+                )
+            
+                st.plotly_chart(fig_emission, use_container_width=True)
+
+
 
 
 
