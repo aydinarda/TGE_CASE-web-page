@@ -412,6 +412,81 @@ if st.button("Run Optimization"):
             - ⚙️ **New Production Facility**  
             - 🏭 **Plant**
             """)
+            
+            
+            # ================================================================
+            # 💰 COST DISTRIBUTION BAR CHART
+            # ================================================================
+            st.markdown("## 💰 Cost Distribution")
+            
+            import plotly.express as px
+            import pandas as pd
+            
+            # Compute costs using the live optimization `results`
+            transport_cost = (
+                results.get("Transport_L1", 0)
+                + results.get("Transport_L2", 0)
+                + results.get("Transport_L2_new", 0)
+                + results.get("Transport_L3", 0)
+            )
+            
+            sourcing_handling_cost = (
+                results.get("Sourcing_L1", 0)
+                + results.get("Handling_L2_total", 0)
+                + results.get("Handling_L3", 0)
+            )
+            
+            co2_cost_production = (
+                results.get("CO2_Manufacturing_State1", 0)
+                + results.get("CO2_Cost_L2_2", 0)
+            )
+            
+            inventory_cost = (
+                results.get("Inventory_L1", 0)
+                + results.get("Inventory_L2", 0)
+                + results.get("Inventory_L2_new", 0)
+                + results.get("Inventory_L3", 0)
+            )
+            
+            # Prepare for nice visualization
+            cost_parts = {
+                "Transportation Cost": transport_cost,
+                "Sourcing/Handling Cost": sourcing_handling_cost,
+                "CO₂ Cost in Production": co2_cost_production,
+                "Inventory Cost": inventory_cost,
+            }
+            
+            df_cost_dist = pd.DataFrame({
+                "Category": list(cost_parts.keys()),
+                "Value": list(cost_parts.values())
+            })
+            
+            # Build Plotly bar chart
+            fig_cost = px.bar(
+                df_cost_dist,
+                x="Category",
+                y="Value",
+                text="Value",
+                color="Category",
+                color_discrete_sequence=["#A7C7E7", "#B0B0B0", "#F8C471", "#5D6D7E"]
+            )
+            
+            fig_cost.update_traces(
+                texttemplate="%{text:,.0f}",
+                textposition="outside"
+            )
+            
+            fig_cost.update_layout(
+                template="plotly_white",
+                showlegend=False,
+                xaxis_tickangle=-35,
+                yaxis_title="€",
+                height=400,
+                yaxis_tickformat=","  # thousand separators
+            )
+            
+            st.plotly_chart(fig_cost, use_container_width=True)
+
 
 
         except gp.GurobiError as ge:
