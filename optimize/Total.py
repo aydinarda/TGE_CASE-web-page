@@ -284,17 +284,6 @@ if st.button("Run Optimization"):
 
             locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
 
-            fig_map = px.scatter_geo(
-                locations,
-                lat="Lat",
-                lon="Lon",
-                color="Type",
-                text="City",
-                projection="natural earth",
-                scope="world",
-            )
-            st.plotly_chart(fig_map, use_container_width=True)
-            
             # ================================================================
             # 🌍 FULL GLOBAL MAP (with new facilities + events)
             # ================================================================
