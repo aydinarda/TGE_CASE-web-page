@@ -25,3 +25,4 @@ jobs:
           wake "https://tnecase-web-page-01.streamlit.app/"
           wake "https://tnecase-opt.streamlit.app/"
           wake "https://tneopt-app.streamlit.app/"
+          wakw "https://tnemerge.streamlit.app/"
