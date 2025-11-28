@@ -438,6 +438,96 @@ if st.button("Run Optimization"):
             
             
             # ================================================================
+            # 🏭 PRODUCTION OUTBOUND PIE CHART (f1 + f2_2)
+            # ================================================================
+            st.markdown("## 🏭 Production Outbound Breakdown")
+            
+            # --- Total market demand reference ---
+            TOTAL_MARKET_DEMAND = sum(results.get(k, 0) for k in [
+                "Inventory_L1", "Inventory_L2", "Inventory_L2_new", "Inventory_L3"
+            ])  # We override below for consistency
+            
+            # We use the fixed value from Scenario 2 (111k units) for consistency
+            TOTAL_MARKET_DEMAND = 111000  
+            
+            # --- Gather flow variables ---
+            f1_vars = [v for v in model.getVars() if v.VarName.startswith("f1[")]
+            f2_2_vars = [v for v in model.getVars() if v.VarName.startswith("f2_2[")]
+            
+            # --- Summation per production source ---
+            prod_sources = {}
+            
+            # Existing plants (f1)
+            for plant in ["TW", "SHA"]:
+                total = 0
+                for var in f1_vars:
+                    if var.VarName.startswith(f"f1[{plant},"):
+                        total += var.X
+                prod_sources[plant] = total
+            
+            # New European factories (f2_2)
+            for fac in ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]:
+                total = 0
+                for var in f2_2_vars:
+                    if var.VarName.startswith(f"f2_2[{fac},"):
+                        total += var.X
+                prod_sources[fac] = total
+            
+            # --- Compute totals and unmet demand ---
+            total_produced = sum(prod_sources.values())
+            unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
+            
+            # --- Convert to percentages ---
+            labels = list(prod_sources.keys()) + ["Unmet Demand"]
+            values = list(prod_sources.values()) + [unmet]
+            
+            df_prod = pd.DataFrame({
+                "Source": labels,
+                "Units Produced": values,
+            })
+            
+            # --- Pie chart ---
+            import plotly.express as px
+            
+            fig_prod = px.pie(
+                df_prod,
+                names="Source",
+                values="Units Produced",
+                hole=0.3,
+                title="Production Share by Source",
+            )
+            
+            # Colors — make Unmet Demand grey
+            color_map = {name: col for name, col in zip(df_prod["Source"], px.colors.qualitative.Set2)}
+            color_map["Unmet Demand"] = "lightgrey"
+            
+            fig_prod.update_traces(
+                textinfo="label+percent",
+                textfont_size=13,
+                marker=dict(colors=[color_map[s] for s in df_prod["Source"]])
+            )
+            fig_prod.update_layout(
+                showlegend=True,
+                height=400,
+                template="plotly_white",
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            
+            st.plotly_chart(fig_prod, use_container_width=True)
+            
+            # --- Table version below chart ---
+            st.markdown("#### 📦 Production Summary Table")
+            st.dataframe(df_prod.round(2), use_container_width=True)
+
+            
+            
+            
+            
+            
+            
+            
+            
+            # ================================================================
             # 🚚 TRANSPORT FLOWS BY MODE (L1, L2, L2_2, L3)
             # ================================================================
             st.markdown("## 🚚 Transport Flows by Mode")
