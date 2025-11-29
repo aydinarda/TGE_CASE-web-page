@@ -200,7 +200,7 @@ if mode == "Session Mode":
 st.subheader("📊 Scenario Parameters")
 
 co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100
-sourcing_cost = positive_input("Sourcing Cost (€ / unit)", 0.0)
+service_level = positive_input("Service Level", 0.9)
 
 model_choice = st.selectbox(
     "Optimization model:",
@@ -227,7 +227,8 @@ if st.button("Run Optimization"):
                     volcano=volcano_flag,
                     trade_war=trade_flag,
                     tariff_rate=tariff_rate_used,
-                    print_results="NO"
+                    print_results="NO",
+                    service_level=service_level
                 )
             else:
                 results, model = run_SC2F(
@@ -238,7 +239,8 @@ if st.button("Run Optimization"):
                     volcano=volcano_flag,
                     trade_war=trade_flag,
                     tariff_rate=tariff_rate_used,
-                    print_results="NO"
+                    print_results="NO",
+                    service_level=service_level
                 )
 
             st.success("Optimization complete! ✅")
@@ -509,25 +511,42 @@ if st.button("Run Optimization"):
             st.warning("⚠ Running fallback model to compute maximum satisfiable demand...")
         
             try:
-                # Fallback unsatisfied-demand model
-                from Scenario_Setting_For_SC2F_uns import run_scenario as run_S2Uns
+                # --------------------------------------------------
+                # CHOOSE CORRECT FALLBACK MODEL
+                # --------------------------------------------------
+                if "SC2F" in model_choice:
+                    from Scenario_Setting_For_SC2F_uns import run_scenario as run_Uns
+                    results_uns, model_uns = run_Uns(
+                        CO_2_percentage=co2_pct,
+                        co2_cost_per_ton_New=co2_cost_per_ton_New,
+                        suez_canal=suez_flag,
+                        oil_crises=oil_flag,
+                        volcano=volcano_flag,
+                        trade_war=trade_flag,
+                        tariff_rate=tariff_rate_used,
+                        print_results="NO"
+                    )
+                else:
+                    from Scenario_Setting_For_SC1F_uns import run_scenario as run_Uns
+                    results_uns, model_uns = run_Uns(
+                        CO_2_percentage=co2_pct,
+                        co2_cost_per_ton=co2_cost_per_ton,
+                        suez_canal=suez_flag,
+                        oil_crises=oil_flag,
+                        volcano=volcano_flag,
+                        trade_war=trade_flag,
+                        tariff_rate=tariff_rate_used,
+                        print_results="NO"
+                    )
         
-                results_uns, model_uns = run_S2Uns(
-                    CO_2_percentage=co2_pct,
-                    co2_cost_per_ton_New=co2_cost_per_ton_New
-                    if "SC2F" in model_choice else co2_cost_per_ton,
-                    suez_canal=suez_flag,
-                    oil_crises=oil_flag,
-                    volcano=volcano_flag,
-                    trade_war=trade_flag,
-                    tariff_rate=tariff_rate_used,
-                    print_results="NO"
-                )
-        
+                # --------------------------------------------------
+                # SUCCESS DISPLAY
+                # --------------------------------------------------
                 st.success("Fallback optimization successful! ✅")
+        
                 st.metric(
                     "📦 Maximum Satisfiable Demand (%)",
-                    f"{results_uns['Satisfied_Demand_pct']*100:.2f}%"
+                    f"{results_uns['Satisfied_Demand_pct'] * 100:.2f}%"
                 )
                 st.metric(
                     "📦 Maximum Satisfiable Demand (Units)",
@@ -536,4 +555,5 @@ if st.button("Run Optimization"):
         
             except Exception as e2:
                 st.error(f"❌ Fallback model also failed: {e2}")
+
 
