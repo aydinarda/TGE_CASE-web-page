@@ -692,10 +692,10 @@ def run_scenario(
     "E_road": E_road,
     "E_lastmile": E_lastmile,
     "E_production": E_production,
-
+    
 
     # --- Objective ---
-    "Objective_value": model.ObjVal - M * quicksum(v[r] for r in Retailers),
+    "Objective_value": model.ObjVal - M * U,
     "Satisfied_Demand_pct":   satisfied_pct,
     "Satisfied_Demand_units": satisfied_units
     }
