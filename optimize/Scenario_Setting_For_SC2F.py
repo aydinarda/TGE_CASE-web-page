@@ -567,6 +567,39 @@ def run_scenario(
     
 
     # Volcano eruption blocks all AIR transportation
+    if volcano:
+        # Layer 1 (Plant → Crossdock)
+        model.addConstrs(
+            (f1[p, c, "air"] == 0
+             for p in Plants
+             for c in Crossdocks),
+            "Volcano_block_f1"
+        )
+        
+        # Layer 2 (Crossdock → DC)
+        model.addConstrs(
+            (f2[c, d, "air"] == 0
+             for c in Crossdocks
+             for d in Dcs),
+            "Volcano_block_f2"
+        )
+    
+        # Layer 2_2 (NewLoc → DC)
+        model.addConstrs(
+            (f2_2[c, d, "air"] == 0
+             for c in New_Locs
+             for d in Dcs),
+            "Volcano_block_f2_2"
+        )
+    
+        # Layer 3 (DC → Retailer)
+        model.addConstrs(
+            (f3[d, r, "air"] == 0
+             for d in Dcs
+             for r in Retailers),
+            "Volcano_block_f3"
+        )
+
 
         
 
@@ -627,46 +660,11 @@ def run_scenario(
 
         print("Total objective:", model.ObjVal)   
         
-        # ============= SAFE EMISSION EXTRACTION =============
-        
-        # --- AIR EMISSIONS ---
-        if "air" in Modes or "air" in ModesL1:
-            # Air mode exists → compute normally
-            try:
-                E_air = (
-                    CO2_tr_L1_air +
-                    CO2_tr_L2_air +
-                    CO2_tr_L3_air
-                ).getValue()
-            except:
-                E_air = 0
-        else:
-            # Volcano mode → air removed
-            E_air = 0
-        
-        # --- SEA EMISSIONS ---
-        try:
-            E_sea = (
-                CO2_tr_L1_sea +
-                CO2_tr_L2_sea +
-                CO2_tr_L3_sea
-            ).getValue()
-        except:
-            E_sea = 0
-        
-        # --- ROAD EMISSIONS ---
-        try:
-            E_road = (
-                CO2_tr_L2_road +
-                CO2_tr_L3_road
-            ).getValue()
-        except:
-            E_road = 0
-        
-        # --- LAST-MILE + PRODUCTION ---
-        E_lastmile = LastMile_CO2.getValue()
-        E_production = CO2_prod_L1.getValue()
-                                
+    E_air         = (CO2_tr_L1_air + CO2_tr_L2_air + CO2_tr_L3_air).getValue()
+    E_sea         = (CO2_tr_L1_sea + CO2_tr_L2_sea + CO2_tr_L3_sea).getValue()
+    E_road        = (CO2_tr_L2_road + CO2_tr_L3_road).getValue()   # no road on L1
+    E_lastmile    = LastMile_CO2.getValue()
+    E_production  = CO2_prod_L1.getValue()
 
         
     results = {
