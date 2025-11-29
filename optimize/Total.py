@@ -543,15 +543,84 @@ if st.button("Run Optimization"):
                 # SUCCESS DISPLAY
                 # --------------------------------------------------
                 st.success("Fallback optimization successful! ✅")
-        
+                
+                
+                # ===============================================================
+                # 🎯 MAXIMUM SATISFIABLE DEMAND
+                # ===============================================================
+                st.markdown("## 📦 Maximum Satisfiable Demand")
+                
                 st.metric(
-                    "📦 Maximum Satisfiable Demand (%)",
+                    "Satisfied Demand (%)",
                     f"{results_uns['Satisfied_Demand_pct'] * 100:.2f}%"
                 )
+                
                 st.metric(
-                    "📦 Maximum Satisfiable Demand (Units)",
+                    "Satisfied Demand (Units)",
                     f"{results_uns['Satisfied_Demand_units']:,.0f}"
                 )
+                
+                # ===============================================================
+                # 💰 OBJECTIVE
+                # ===============================================================
+                st.markdown("## 💰 Objective Value (Excluding Slack Penalty)")
+                st.metric(
+                    "Objective (€)",
+                    f"{results_uns['Objective_value']:,.2f}"
+                )
+                
+                # ===============================================================
+                # 🌿 CO₂ EMISSIONS (Full breakdown)
+                # ===============================================================
+                st.markdown("## 🌿 CO₂ Emissions (Fallback Model)")
+                
+                st.json({
+                    "Air": results_uns.get("E_air", 0),
+                    "Sea": results_uns.get("E_sea", 0),
+                    "Road": results_uns.get("E_road", 0),
+                    "Last-mile": results_uns.get("E_lastmile", 0),
+                    "Production": results_uns.get("E_production", 0),
+                    "Total": results_uns.get("CO2_Total", 0),
+                })
+                
+                # ===============================================================
+                # 🚚 TRANSPORT COSTS
+                # ===============================================================
+                st.markdown("## 🚚 Transport Costs")
+                
+                st.json({
+                    "Transport L1": results_uns.get("Transport_L1", 0),
+                    "Transport L2 (existing)": results_uns.get("Transport_L2", 0),
+                    "Transport L2 (new locs)": results_uns.get("Transport_L2_new", 0),
+                    "Transport L3": results_uns.get("Transport_L3", 0),
+                })
+                
+                # ===============================================================
+                # 📦 INVENTORY COSTS
+                # ===============================================================
+                st.markdown("## 📦 Inventory Costs")
+                
+                st.json({
+                    "Inventory L1": results_uns.get("Inventory_L1", 0),
+                    "Inventory L2": results_uns.get("Inventory_L2", 0),
+                    "Inventory L2 (new locs)": results_uns.get("Inventory_L2_new", 0),
+                    "Inventory L3": results_uns.get("Inventory_L3", 0),
+                })
+                
+                # ===============================================================
+                # 🏭 SOURCING, HANDLING, NEW LOCATIONS
+                # ===============================================================
+                st.markdown("## 🏭 Sourcing / Handling / New Facility Costs")
+                
+                st.json({
+                    "Sourcing L1": results_uns.get("Sourcing_L1", 0),
+                    "Handling L2 (existing)": results_uns.get("Handling_L2_existing", 0),
+                    "Handling L2 (total)": results_uns.get("Handling_L2_total", 0),
+                    "Handling L3": results_uns.get("Handling_L3", 0),
+                    "Fixed Cost (New Facilities)": results_uns.get("FixedCost_NewLocs", 0),
+                    "Production Cost (New Facilities)": results_uns.get("ProdCost_NewLocs", 0),
+                })
+        
         
             except Exception as e2:
                 st.error(f"❌ Fallback model also failed: {e2}")
