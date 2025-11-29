@@ -650,7 +650,13 @@ def run_scenario(
     E_lastmile    = LastMile_CO2.getValue()
     E_production  = CO2_prod_L1.getValue()
 
-        
+    
+    U = sum(v[r].X for r in Retailers)         # unmet demand
+    D_tot = sum(demand[r] for r in Retailers)  # total original demand
+
+    satisfied_units = D_tot - U
+    satisfied_pct   = satisfied_units / D_tot
+    
     results = {
     # --- Transport Costs ---
     "Transport_L1": sum(Transport_L1[mo].getValue() for mo in ModesL1),
@@ -690,7 +696,8 @@ def run_scenario(
 
     # --- Objective ---
     "Objective_value": model.ObjVal - M * quicksum(v[r] for r in Retailers),
-    "Satisfied Demand": (110000 - quicksum(v[r] for r in Retailers))/ 110000
+    "Satisfied_Demand_pct":   satisfied_pct,
+    "Satisfied_Demand_units": satisfied_units
     }
 
     return results, model
