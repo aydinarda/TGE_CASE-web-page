@@ -627,11 +627,46 @@ def run_scenario(
 
         print("Total objective:", model.ObjVal)   
         
-    E_air         = (CO2_tr_L1_air + CO2_tr_L2_air + CO2_tr_L3_air).getValue()
-    E_sea         = (CO2_tr_L1_sea + CO2_tr_L2_sea + CO2_tr_L3_sea).getValue()
-    E_road        = (CO2_tr_L2_road + CO2_tr_L3_road).getValue()   # no road on L1
-    E_lastmile    = LastMile_CO2.getValue()
-    E_production  = CO2_prod_L1.getValue()
+        # ============= SAFE EMISSION EXTRACTION =============
+        
+        # --- AIR EMISSIONS ---
+        if "air" in Modes or "air" in ModesL1:
+            # Air mode exists → compute normally
+            try:
+                E_air = (
+                    CO2_tr_L1_air +
+                    CO2_tr_L2_air +
+                    CO2_tr_L3_air
+                ).getValue()
+            except:
+                E_air = 0
+        else:
+            # Volcano mode → air removed
+            E_air = 0
+        
+        # --- SEA EMISSIONS ---
+        try:
+            E_sea = (
+                CO2_tr_L1_sea +
+                CO2_tr_L2_sea +
+                CO2_tr_L3_sea
+            ).getValue()
+        except:
+            E_sea = 0
+        
+        # --- ROAD EMISSIONS ---
+        try:
+            E_road = (
+                CO2_tr_L2_road +
+                CO2_tr_L3_road
+            ).getValue()
+        except:
+            E_road = 0
+        
+        # --- LAST-MILE + PRODUCTION ---
+        E_lastmile = LastMile_CO2.getValue()
+        E_production = CO2_prod_L1.getValue()
+                                
 
         
     results = {
