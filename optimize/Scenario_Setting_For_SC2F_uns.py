@@ -540,50 +540,15 @@ def run_scenario(
 
 
     if volcano:
-
-        # f1: Plant → Crossdock
-        model.addConstrs(
-            (f1[p, c, mo] <= 0.00001
-             for p in Plants
-             for c in Crossdocks
-             for mo in Modes
-             if mo == "air"),
-            name="VolcanoBlockAir_f1"
-        )
-    
-        # f2: Crossdock → DC
-        model.addConstrs(
-            (f2[c, d, mo] <= 0.00001
-             for c in Crossdocks
-             for d in Dcs
-             for mo in Modes
-             if mo == "air"),
-            name="VolcanoBlockAir_f2"
-        )
-    
-        # f2_2: Crossdock → DC (secondary)
-        model.addConstrs(
-            (f2_2[c, d, mo] <= 0.00001
-             for c in Crossdocks
-             for d in Dcs
-             for mo in Modes
-             if mo == "air"),
-            name="VolcanoBlockAir_f2_2"
-        )
-    
-        # f3: DC → Customer
-        model.addConstrs(
-            (f3[d, r, mo] <= 0.00001
-             for d in Dcs
-             for r in Retailers
-             for mo in Modes
-             if mo == "air"),
-            name="VolcanoBlockAir_f3"
-        )        
         
-        if trade_war:
+        if "air" in Modes:
+            Modes.remove("air")
+        if "air" in ModesL1:
+            ModesL1.remove("air")        
+        
+    if trade_war:
             
-            Sourcing_L1 = Sourcing_L1*tariff_rate
+        Sourcing_L1 = Sourcing_L1*tariff_rate
 
     
     # --------------
