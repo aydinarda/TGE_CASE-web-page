@@ -452,6 +452,73 @@ def run_scenario(
         name="CO2ReductionTarget"
     )
     
+    
+    # -----------------------------
+    # SCENARIO SETTINGS FOR SC1F
+    # -----------------------------
+    
+    # SUEZ CANAL BLOCKADE
+    if suez_canal == True:
+           model.addConstrs(
+        (f1[p, c, mo] == 0
+         for p in Plants
+         for c in Crossdocks
+         for mo in Modes
+         if mo == "sea"),
+        name="SeaDamage_f1"
+    )
+           
+        # Rerouting can be applied
+    
+    
+    # A new oil crises
+    if oil_crises == True:
+        Total_Transport = Total_Transport*1.3
+        LastMile_Cost = LastMile_Cost * 1.3
+        
+    
+
+    # Volcano eruption blocks all AIR transportation
+
+
+    if volcano:
+
+        # f1: Plant → Crossdock
+        model.addConstrs(
+            (f1[p, c, mo] <= 0.00001
+             for p in Plants
+             for c in Crossdocks
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f1"
+        )
+    
+        # f2: Crossdock → DC
+        model.addConstrs(
+            (f2[c, d, mo] <= 0.00001
+             for c in Crossdocks
+             for d in Dcs
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f2"
+        )
+    
+    
+        # f3: DC → Customer
+        model.addConstrs(
+            (f3[d, r, mo] <= 0.00001
+             for d in Dcs
+             for r in Retailers
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f3"
+        )        
+        
+        if trade_war:
+            
+            Sourcing_L1 = Sourcing_L1*tariff_rate
+
+    
     # -----------------------------
     # OBJECTIVE
     # -----------------------------

@@ -47,7 +47,13 @@ def run_scenario(
     CO_2_percentage=0.5,
     unit_penaltycost = 1.7,
     print_results = "YES",
-    unit_inventory_holdingCost=0.85
+    unit_inventory_holdingCost=0.85,
+    suez_canal = False,
+    oil_crises = False,
+    volcano = False,
+    trade_war = False,
+    tariff_rate=1,
+    service_level = 0.9
 ):
     # =====================================================
     # DEFAULT DATA (filled from original SC2)
@@ -445,6 +451,74 @@ def run_scenario(
         Total_CO2 <= CO2_base * (1 - CO_2_percentage),
         name="CO2ReductionTarget"
     )
+    
+    
+    # -----------------------------
+    # SCENARIO SETTINGS FOR SC1F
+    # -----------------------------
+    
+    # SUEZ CANAL BLOCKADE
+    if suez_canal == True:
+           model.addConstrs(
+        (f1[p, c, mo] == 0
+         for p in Plants
+         for c in Crossdocks
+         for mo in Modes
+         if mo == "sea"),
+        name="SeaDamage_f1"
+    )
+           
+        # Rerouting can be applied
+    
+    
+    # A new oil crises
+    if oil_crises == True:
+        Total_Transport = Total_Transport*1.3
+        LastMile_Cost = LastMile_Cost * 1.3
+        
+    
+
+    # Volcano eruption blocks all AIR transportation
+
+
+    if volcano:
+
+        # f1: Plant → Crossdock
+        model.addConstrs(
+            (f1[p, c, mo] <= 0.00001
+             for p in Plants
+             for c in Crossdocks
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f1"
+        )
+    
+        # f2: Crossdock → DC
+        model.addConstrs(
+            (f2[c, d, mo] <= 0.00001
+             for c in Crossdocks
+             for d in Dcs
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f2"
+        )
+    
+    
+        # f3: DC → Customer
+        model.addConstrs(
+            (f3[d, r, mo] <= 0.00001
+             for d in Dcs
+             for r in Retailers
+             for mo in Modes
+             if mo == "air"),
+            name="VolcanoBlockAir_f3"
+        )        
+        
+        if trade_war:
+            
+            Sourcing_L1 = Sourcing_L1*tariff_rate
+
+    
     
     
     M = 1e8
