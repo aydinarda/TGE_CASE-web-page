@@ -141,6 +141,37 @@ def run_scenario(
     Retailers = list(demand.keys())
     product_weight_ton = product_weight / 1000.0
     
+    
+    # ============================================================
+    # 🌋 VOLCANO EVENT → REMOVE AIR MODE ENTIRELY (BEFORE MODEL)
+    # ============================================================
+    if volcano:
+        # Remove air from mode lists so no air flows or costs are built
+        if "air" in Modes:
+            Modes.remove("air")
+        if "air" in ModesL1:
+            ModesL1.remove("air")
+    
+        # Remove air from service level, tau, emission factor safely
+        if "air" in co2_emission_factor:
+            co2_emission_factor.pop("air", None)
+    
+        if "air" in data["t (€/kg-km)"]:
+            # but your data is not dict, so skip this
+            pass
+    
+        # Remove "air" rows before df is built
+        data = data.copy()
+        if "air" in data["transportation"]:
+            idx = data["transportation"].index("air")
+            for col in data:
+                if isinstance(data[col], list):
+                    data[col].pop(idx)
+
+    
+    
+    
+    
     df = pd.DataFrame(data).set_index("transportation")
     
     
@@ -537,13 +568,6 @@ def run_scenario(
 
     # Volcano eruption blocks all AIR transportation
 
-
-    if volcano:
-        
-        if "air" in Modes:
-            Modes.remove("air")
-        if "air" in ModesL1:
-            ModesL1.remove("air")
         
 
     if trade_war:
