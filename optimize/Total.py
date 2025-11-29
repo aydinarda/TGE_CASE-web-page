@@ -543,12 +543,11 @@ if st.button("Run Optimization"):
                 # SUCCESS DISPLAY
                 # --------------------------------------------------
                 st.success("Fallback optimization successful! ✅")
-                
-                
+
                 # ===============================================================
                 # 🎯 MAXIMUM SATISFIABLE DEMAND
                 # ===============================================================
-                st.markdown("## 📦 Maximum Satisfiable Demand")
+                st.markdown("## 📦 Maximum Satisfiable Demand (Fallback Model)")
                 
                 st.metric(
                     "Satisfied Demand (%)",
@@ -570,57 +569,205 @@ if st.button("Run Optimization"):
                 )
                 
                 # ===============================================================
-                # 🌿 CO₂ EMISSIONS (Full breakdown)
+                # 🌍 MAP
                 # ===============================================================
-                st.markdown("## 🌿 CO₂ Emissions (Fallback Model)")
+                st.markdown("## 🌍 Global Supply Chain Map (Fallback Model)")
                 
-                st.json({
-                    "Air": results_uns.get("E_air", 0),
-                    "Sea": results_uns.get("E_sea", 0),
-                    "Road": results_uns.get("E_road", 0),
-                    "Last-mile": results_uns.get("E_lastmile", 0),
-                    "Production": results_uns.get("E_production", 0),
-                    "Total": results_uns.get("CO2_Total", 0),
-                })
+                nodes = [
+                    ("Plant", 31.23, 121.47, "Shanghai"),
+                    ("Plant", 22.32, 114.17, "Hong Kong"),
+                    ("Cross-dock", 48.85, 2.35, "Paris"),
+                    ("Cross-dock", 50.11, 8.68, "Frankfurt"),
+                    ("Cross-dock", 37.98, 23.73, "Athens"),
+                    ("DC", 47.50, 19.04, "Budapest"),
+                    ("DC", 48.14, 11.58, "Munich"),
+                    ("DC", 46.95, 7.44, "Bern"),
+                    ("DC", 45.46, 9.19, "Milan"),
+                    ("Retail", 55.67, 12.57, "Copenhagen"),
+                    ("Retail", 53.35, -6.26, "Dublin"),
+                    ("Retail", 51.50, -0.12, "London"),
+                    ("Retail", 49.82, 19.08, "Krakow"),
+                    ("Retail", 45.76, 4.83, "Lyon"),
+                    ("Retail", 43.30, 5.37, "Marseille"),
+                    ("Retail", 40.42, -3.70, "Madrid"),
+                ]
+                
+                locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+                
+                # Add new facilities from fallback model
+                facility_coords = {
+                    "HUDTG": (49.61, 6.13, "Luxembourg"),
+                    "CZMCT": (44.83, 20.42, "Belgrade"),
+                    "IEILG": (47.09, 16.37, "Graz"),
+                    "FIMPF": (50.45, 14.50, "Prague"),
+                    "PLZCA": (42.70, 12.65, "Viterbo"),
+                }
+                
+                for name, (lat, lon, city) in facility_coords.items():
+                    var = model_uns.getVarByName(f"f2_2_bin[{name}]")
+                    if var is not None and var.X > 0.5:
+                        nodes.append(("New Production Facility", lat, lon, city))
+                
+                locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+                
+                event_nodes = []
+                
+                if suez_flag:
+                    event_nodes.append(("Event: Suez Canal Blockade", 30.59, 32.27, "Suez Canal Crisis"))
+                if volcano_flag:
+                    event_nodes.append(("Event: Volcano Eruption", 63.63, -19.62, "Volcanic Ash Zone"))
+                if oil_flag:
+                    event_nodes.append(("Event: Oil Crisis", 28.60, 47.80, "Oil Supply Shock"))
+                if trade_flag:
+                    event_nodes.append(("Event: Trade War", 55.00, 60.00, "Trade War Impact Zone"))
+                
+                if event_nodes:
+                    df_events = pd.DataFrame(event_nodes, columns=["Type", "Lat", "Lon", "City"])
+                    locations = pd.concat([locations, df_events], ignore_index=True)
+                
+                color_map = {
+                    "Plant": "purple",
+                    "Cross-dock": "dodgerblue",
+                    "Distribution Centre": "black",
+                    "Retailer Hub": "red",
+                    "New Production Facility": "deepskyblue",
+                    "Event: Suez Canal Blockade": "gold",
+                    "Event: Volcano Eruption": "orange",
+                    "Event: Oil Crisis": "brown",
+                    "Event: Trade War": "green",
+                }
+                
+                size_map = {
+                    "Plant": 15,
+                    "Cross-dock": 14,
+                    "Distribution Centre": 16,
+                    "Retailer Hub": 20,
+                    "New Production Facility": 14,
+                    "Event: Suez Canal Blockade": 18,
+                    "Event: Volcano Eruption": 18,
+                    "Event: Oil Crisis": 18,
+                    "Event: Trade War": 18,
+                }
+                
+                fig_map = px.scatter_geo(
+                    locations,
+                    lat="Lat",
+                    lon="Lon",
+                    color="Type",
+                    text="City",
+                    hover_name="City",
+                    color_discrete_map=color_map,
+                    projection="natural earth",
+                    scope="world",
+                    title="Global Supply Chain Structure (Fallback Model)",
+                )
+                
+                for trace in fig_map.data:
+                    trace.marker.update(
+                        size=size_map.get(trace.name, 12),
+                        opacity=0.9,
+                        line=dict(width=0.5, color="white"),
+                    )
+                
+                fig_map.update_geos(
+                    showcountries=True,
+                    countrycolor="lightgray",
+                    showland=True,
+                    landcolor="rgb(245,245,245)",
+                    fitbounds="locations",
+                )
+                
+                fig_map.update_layout(
+                    height=600,
+                    margin=dict(l=0, r=0, t=40, b=0),
+                )
+                
+                st.plotly_chart(fig_map, use_container_width=True)
                 
                 # ===============================================================
-                # 🚚 TRANSPORT COSTS
+                # 🏭 PRODUCTION OUTBOUND PIE CHART
                 # ===============================================================
-                st.markdown("## 🚚 Transport Costs")
+                st.markdown("## 🏭 Production Outbound Breakdown (Fallback Model)")
                 
-                st.json({
-                    "Transport L1": results_uns.get("Transport_L1", 0),
-                    "Transport L2 (existing)": results_uns.get("Transport_L2", 0),
-                    "Transport L2 (new locs)": results_uns.get("Transport_L2_new", 0),
-                    "Transport L3": results_uns.get("Transport_L3", 0),
-                })
+                f1_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f1[")]
+                f2_2_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f2_2[")]
+                
+                prod_sources = {}
+                
+                # Existing plants
+                for plant in ["TW", "SHA"]:
+                    total = sum(v.X for v in f1_vars if v.VarName.startswith(f"f1[{plant},"))
+                    prod_sources[plant] = total
+                
+                # New EU facilities
+                for fac in ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]:
+                    total = sum(v.X for v in f2_2_vars if v.VarName.startswith(f"f2_2[{fac},"))
+                    prod_sources[fac] = total
+                
+                TOTAL_MARKET_DEMAND = 111000
+                total_produced = sum(prod_sources.values())
+                unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
+                
+                labels = list(prod_sources.keys()) + ["Unmet Demand"]
+                values = list(prod_sources.values()) + [unmet]
+                
+                df_prod = pd.DataFrame({"Source": labels, "Units Produced": values})
+                
+                fig_prod = px.pie(
+                    df_prod,
+                    names="Source",
+                    values="Units Produced",
+                    hole=0.3,
+                    title="Production Share by Source (Fallback Model)",
+                )
+                
+                fig_prod.update_traces(
+                    textinfo="label+percent",
+                    textfont_size=13
+                )
+                
+                st.plotly_chart(fig_prod, use_container_width=True)
+                
+                st.dataframe(df_prod.round(2), use_container_width=True)
                 
                 # ===============================================================
-                # 📦 INVENTORY COSTS
+                # 🚚 CROSS-DOCK OUTBOUND PIE CHART
                 # ===============================================================
-                st.markdown("## 📦 Inventory Costs")
+                st.markdown("## 🚚 Cross-dock Outbound Breakdown (Fallback Model)")
                 
-                st.json({
-                    "Inventory L1": results_uns.get("Inventory_L1", 0),
-                    "Inventory L2": results_uns.get("Inventory_L2", 0),
-                    "Inventory L2 (new locs)": results_uns.get("Inventory_L2_new", 0),
-                    "Inventory L3": results_uns.get("Inventory_L3", 0),
-                })
+                f2_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f2[")]
                 
-                # ===============================================================
-                # 🏭 SOURCING, HANDLING, NEW LOCATIONS
-                # ===============================================================
-                st.markdown("## 🏭 Sourcing / Handling / New Facility Costs")
+                crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
+                crossdock_flows = {}
                 
-                st.json({
-                    "Sourcing L1": results_uns.get("Sourcing_L1", 0),
-                    "Handling L2 (existing)": results_uns.get("Handling_L2_existing", 0),
-                    "Handling L2 (total)": results_uns.get("Handling_L2_total", 0),
-                    "Handling L3": results_uns.get("Handling_L3", 0),
-                    "Fixed Cost (New Facilities)": results_uns.get("FixedCost_NewLocs", 0),
-                    "Production Cost (New Facilities)": results_uns.get("ProdCost_NewLocs", 0),
-                })
-        
+                for cd in crossdocks:
+                    total = sum(v.X for v in f2_vars if v.VarName.startswith(f"f2[{cd},"))
+                    crossdock_flows[cd] = total
+                
+                if sum(crossdock_flows.values()) == 0:
+                    st.info("No cross-dock activity.")
+                else:
+                    df_crossdock = pd.DataFrame({
+                        "Crossdock": list(crossdock_flows.keys()),
+                        "Shipped (units)": list(crossdock_flows.values()),
+                    })
+                    df_crossdock["Share (%)"] = (
+                        df_crossdock["Shipped (units)"] /
+                        df_crossdock["Shipped (units)"].sum()
+                    ) * 100
+                
+                    fig_crossdock = px.pie(
+                        df_crossdock,
+                        names="Crossdock",
+                        values="Shipped (units)",
+                        hole=0.3,
+                        title="Cross-dock Outbound Share (Fallback Model)"
+                    )
+                
+                    st.plotly_chart(fig_crossdock, use_container_width=True)
+                    st.dataframe(df_crossdock.round(2), use_container_width=True)
+                
+                        
         
             except Exception as e2:
                 st.error(f"❌ Fallback model also failed: {e2}")
