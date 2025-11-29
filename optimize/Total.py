@@ -144,7 +144,6 @@ if "session_step" not in st.session_state:
 EVENTS = {
     "suez_canal": "🚢 Suez Canal is blocked.",
     "oil_crises": "⛽ Oil crisis increases energy cost.",
-    "volcano": "🌋 Volcano blocks air travel.",
     "trade_war": "💼 Trade war increases tariffs.",
 }
 
