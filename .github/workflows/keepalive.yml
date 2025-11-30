@@ -33,6 +33,7 @@ jobs:
               "https://tnecase-opt.streamlit.app/",
               "https://tnecase-web-page-01.streamlit.app/",
               "https://tne-case-web-sc1.streamlit.app/",
+              "https://tnemerge.streamlit.app/"
           ]
 
           print("\n--- Starting Playwright Keepalive ---\n")
