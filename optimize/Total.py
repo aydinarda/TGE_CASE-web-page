@@ -228,6 +228,11 @@ page_mode = st.sidebar.radio(
     key="page_mode"
 )
 
+# Check if navigation came from Home page buttons
+if "page_mode_nav" in st.session_state:
+    page_mode = st.session_state.page_mode_nav
+    del st.session_state.page_mode_nav
+
 # ================================================================
 # HOME PAGE
 # ================================================================
@@ -246,7 +251,7 @@ if page_mode == "🏠 Home":
         - Analyze costs, emissions, and demand fulfillment
         """)
         if st.button("Go to Optimization →", key="btn_opt", use_container_width=True):
-            st.session_state.page_mode = "📊 Optimization"
+            st.session_state.page_mode_nav = "📊 Optimization"
             st.rerun()
     
     with col2:
@@ -258,7 +263,7 @@ if page_mode == "🏠 Home":
         - Learn how optimization improves performance
         """)
         if st.button("Go to Guessing Game →", key="btn_guess", use_container_width=True):
-            st.session_state.page_mode = "🎮 Guessing Game"
+            st.session_state.page_mode_nav = "🎮 Guessing Game"
             st.rerun()
     
     st.markdown("---")
