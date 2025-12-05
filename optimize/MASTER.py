@@ -38,7 +38,9 @@ def run_scenario_master(
     selected_retailers=None,        # List of retailers to use
     selected_new_locs=None,         # List of new facilities to use
     selected_modes=None,            # List of transportation modes to use
-    selected_modes_l1=None,         # List of modes for layer 1 (defaults to subset of selected_modes)
+    selected_modes_l1=None,         # List of modes for layer 1: Plant->Crossdock
+    selected_modes_l2=None,         # List of modes for layer 2: Crossdock->DC
+    selected_modes_l3=None,         # List of modes for layer 3: DC->Retailer
 
     # --- ORTAK PARAMETRELER ---
     dc_capacity=None,
@@ -96,6 +98,8 @@ def run_scenario_master(
     Retailers = selected_retailers if selected_retailers is not None else ALL_RETAILERS
     Modes = selected_modes if selected_modes is not None else ALL_MODES
     ModesL1 = selected_modes_l1 if selected_modes_l1 is not None else [m for m in ALL_MODES_L1 if m in Modes]
+    ModesL2 = selected_modes_l2 if selected_modes_l2 is not None else Modes
+    ModesL3 = selected_modes_l3 if selected_modes_l3 is not None else Modes
     
     # --- COMPLETE DEFAULT DATA (all locations) ---
     all_demand = {
