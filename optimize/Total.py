@@ -53,7 +53,7 @@ with st.sidebar.expander("🏭 Factory Model", expanded=True):
 with st.sidebar.expander("📊 Optimization", expanded=True):
     opt_choice = st.radio(
         "Select:",
-        ["Optimization Dashboard"],
+        ["Optimization Dashboard", "🎮 Guessing Game"],
         index=None,
         key="optimization_radio"
     )
@@ -72,15 +72,41 @@ elif factory_choice == "SC2 – New Facilities":
 elif opt_choice == "Optimization Dashboard":
     pass  # Continue into optimization block below
 
+elif opt_choice == "🎮 Guessing Game":
+    pass  # Continue into guessing game block below
+
 else:
     st.write("👈 Select a page from the Navigation menu.")
     st.stop()
 
 # ================================================================
-# OPTIMIZATION DASHBOARD
+# CHECK WHICH MODE: OPTIMIZATION vs GUESSING GAME
+# ================================================================
+if opt_choice == "🎮 Guessing Game":
+    is_guessing_mode = True
+else:
+    is_guessing_mode = False
+
+# ================================================================
+# OPTIMIZATION DASHBOARD & GUESSING GAME (unified)
 # ================================================================
 
-st.title("🌍 Global Supply Chain Optimization (Gurobi)")
+if is_guessing_mode:
+    st.title("🎮 Supply Chain Guessing Game")
+    st.markdown("""
+    **Welcome to the Guessing Game!**
+    
+    In this mode, you will:
+    1. Make strategic selections for locations and transportation modes
+    2. Set CO₂ and service level targets
+    3. Submit your GUESS at what the optimal cost will be
+    4. Then reveal the actual optimization result
+    5. See how close your estimate was!
+    
+    This helps you understand supply chain trade-offs and build intuition about cost drivers.
+    """)
+else:
+    st.title("🌍 Global Supply Chain Optimization (Gurobi)")
 
 # ------------------------------------------------------------
 # Google Analytics Injection (safe)
@@ -133,10 +159,80 @@ def positive_input(label, default):
         st.warning(f"{label} must be numeric. Using {default}.")
         return default
 
+# ================================================================
+# PARAMETRIC LOCATION & MODE SELECTION (for Guessing Game)
+# ================================================================
+selected_plants_list = None
+selected_crossdocks_list = None
+selected_dcs_list = None
+selected_retailers_list = None
+selected_new_locs_list = None
+selected_modes_list = None
+selected_modes_l1_list = None
+
+if is_guessing_mode:
+    st.subheader("📍 Select Your Supply Chain Network")
+    st.markdown("Choose which locations and modes to include in your optimized network:")
+    
+    # Available options
+    all_plants = ["TW", "SHA"]
+    all_crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
+    all_dcs = ["PED", "FR6216", "RIX", "GMZ"]
+    all_retailers = ["FLUXC", "ALKFM", "KSJER", "GXEQH", "OAHLE", "ISNQE", "NAAVF"]
+    all_modes = ["air", "sea", "road"]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("**Plants (Sourcing)**")
+        selected_plants_list = st.multiselect(
+            "Plants:", all_plants, default=all_plants, key="param_plants"
+        )
+        
+        st.markdown("**Crossdocks**")
+        selected_crossdocks_list = st.multiselect(
+            "Crossdocks:", all_crossdocks, default=all_crossdocks, key="param_cd"
+        )
+    
+    with col2:
+        st.markdown("**Distribution Centers**")
+        selected_dcs_list = st.multiselect(
+            "DCs:", all_dcs, default=all_dcs, key="param_dcs"
+        )
+        
+        st.markdown("**Retailers (Markets)**")
+        selected_retailers_list = st.multiselect(
+            "Retailers:", all_retailers, default=all_retailers[:3], key="param_retail"
+        )
+    
+    with col3:
+        st.markdown("**Transportation Modes**")
+        selected_modes_list = st.multiselect(
+            "Modes:", all_modes, default=all_modes, key="param_modes"
+        )
+        
+        st.markdown("**Modes for Layer 1 (International)**")
+        selected_modes_l1_list = st.multiselect(
+            "Modes L1:", all_modes, default=["air", "sea"], key="param_modes_l1"
+        )
+    
+    # Show network summary
+    st.info(f"""
+    **Network Summary:**
+    - Plants: {', '.join(selected_plants_list) if selected_plants_list else 'None'}
+    - Crossdocks: {', '.join(selected_crossdocks_list) if selected_crossdocks_list else 'None'}
+    - DCs: {', '.join(selected_dcs_list) if selected_dcs_list else 'None'}
+    - Retailers: {', '.join(selected_retailers_list) if selected_retailers_list else 'None'}
+    - Modes: {', '.join(selected_modes_list) if selected_modes_list else 'None'}
+    """)
+
 # ------------------------------------------------------------
 # Mode selection (Normal vs Session)
 # ------------------------------------------------------------
-mode = st.radio("Select mode:", ["Normal Mode", "Session Mode"])
+if not is_guessing_mode:
+    mode = st.radio("Select mode:", ["Normal Mode", "Session Mode"])
+else:
+    mode = "Normal Mode"  # Guessing game always uses Normal Mode
 
 if "session_step" not in st.session_state:
     st.session_state.session_step = 0
@@ -211,99 +307,204 @@ if "SC1F" in model_choice:
 else:
     co2_cost_per_ton_New = positive_input("CO₂ Cost per ton (New Facility)", 60)
 
+# ================================================================
+# GUESSING GAME: GUESS PHASE
+# ================================================================
+if is_guessing_mode:
+    st.divider()
+    st.subheader("🎯 Make Your Guess")
+    st.markdown("""
+    Based on your network selections and parameters above, **estimate what you think the 
+    optimal total cost will be** for this supply chain configuration.
+    
+    Consider:
+    - Number of facilities (more facilities = more costs)
+    - Transportation modes (air = expensive, sea = cheap)
+    - Service level (higher = inventory costs)
+    - CO₂ constraints (stricter = must use expensive clean modes)
+    """)
+    
+    guess_cost = st.number_input(
+        "Your cost estimate (€):",
+        min_value=0.0,
+        value=500000.0,
+        step=10000.0,
+        key="guess_input"
+    )
+    
+    st.write(f"**Your Guess: €{guess_cost:,.2f}**")
+
 # ------------------------------------------------------------
 # RUN OPTIMIZATION
 # ------------------------------------------------------------
-if st.button("Run Optimization"):
+button_label = "Reveal Answer" if is_guessing_mode else "Run Optimization"
+
+if st.button(button_label):
     with st.spinner("⚙ Optimizing with Gurobi..."):
         try:
+            # Prepare parameters based on selections
+            opt_params = {
+                "CO_2_percentage": co2_pct,
+                "suez_canal": suez_flag,
+                "oil_crises": oil_flag,
+                "volcano": volcano_flag,
+                "trade_war": trade_flag,
+                "tariff_rate": tariff_rate_used,
+                "print_results": "NO",
+                "service_level": service_level,
+            }
+            
+            # Add parametric selections for guessing game
+            if is_guessing_mode:
+                opt_params["selected_plants"] = selected_plants_list
+                opt_params["selected_crossdocks"] = selected_crossdocks_list
+                opt_params["selected_dcs"] = selected_dcs_list
+                opt_params["selected_retailers"] = selected_retailers_list
+                opt_params["selected_modes"] = selected_modes_list
+                opt_params["selected_modes_l1"] = selected_modes_l1_list
+            
             if "SC1F" in model_choice:
-                results, model = run_SC1F(
-                    CO_2_percentage=co2_pct,
-                    co2_cost_per_ton=co2_cost_per_ton,
-                    suez_canal=suez_flag,
-                    oil_crises=oil_flag,
-                    volcano=volcano_flag,
-                    trade_war=trade_flag,
-                    tariff_rate=tariff_rate_used,
-                    print_results="NO",
-                    service_level=service_level
-                )
+                opt_params["co2_cost_per_ton"] = co2_cost_per_ton
+                from MASTER import run_scenario_master
+                results, model = run_scenario_master(**opt_params)
             else:
-                results, model = run_SC2F(
-                    CO_2_percentage=co2_pct,
-                    co2_cost_per_ton_New=co2_cost_per_ton_New,
-                    suez_canal=suez_flag,
-                    oil_crises=oil_flag,
-                    volcano=volcano_flag,
-                    trade_war=trade_flag,
-                    tariff_rate=tariff_rate_used,
-                    print_results="NO",
-                    service_level=service_level
-                )
+                opt_params["co2_cost_per_ton_New"] = co2_cost_per_ton_New
+                from MASTER import run_scenario_master
+                results, model = run_scenario_master(**opt_params)
 
             st.success("Optimization complete! ✅")
 
-            # ===========================================
-            # Objective + Emissions
-            # ===========================================
-            st.metric("💰 Objective Value (€)", f"{results['Objective_value']:,.2f}")
-
-            st.subheader("🌿 CO₂ Emissions")
-            st.json({
-                "Air": results.get("E_air", 0),
-                "Sea": results.get("E_sea", 0),
-                "Road": results.get("E_road", 0),
-                "Last-mile": results.get("E_lastmile", 0),
-                "Production": results.get("E_production", 0),
-                "Total": results.get("CO2_Total", 0),
-            })
-
-            # ===========================================
-            # 🌍 MAP (no more pd errors!)
-            # ===========================================
-            st.markdown("## 🌍 Global Supply Chain Map")
-
-            nodes = [
-                ("Plant", 31.23, 121.47, "Shanghai"),
-                ("Plant", 22.32, 114.17, "Hong Kong"),
-                ("Cross-dock", 48.85, 2.35, "Paris"),
-                ("Cross-dock", 50.11, 8.68, "Frankfurt"),
-                ("Cross-dock", 37.98, 23.73, "Athens"),
-                ("DC", 47.50, 19.04, "Budapest"),
-                ("DC", 48.14, 11.58, "Munich"),
-                ("DC", 46.95, 7.44, "Bern"),
-                ("DC", 45.46, 9.19, "Milan"),
-                ("Retail", 55.67, 12.57, "Copenhagen"),
-                ("Retail", 53.35, -6.26, "Dublin"),
-                ("Retail", 51.50, -0.12, "London"),
-                ("Retail", 49.82, 19.08, "Krakow"),
-                ("Retail", 45.76, 4.83, "Lyon"),
-                ("Retail", 43.30, 5.37, "Marseille"),
-                ("Retail", 40.42, -3.70, "Madrid"),
-            ]
-
-            locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
-
             # ================================================================
-            # 🌍 FULL GLOBAL MAP (with new facilities + events)
+            # GUESSING GAME: RESULTS & FEEDBACK
             # ================================================================
-            
-            # New facilities (only if active)
-            facility_coords = {
-                "HUDTG": (49.61, 6.13, "Luxembourg"),
-                "CZMCT": (44.83, 20.42, "Belgrade"),
-                "IEILG": (47.09, 16.37, "Graz"),
-                "FIMPF": (50.45, 14.50, "Prague"),
-                "PLZCA": (42.70, 12.65, "Viterbo"),
-            }
-            
-            for name, (lat, lon, city) in facility_coords.items():
-                var = model.getVarByName(f"f2_2_bin[{name}]")
-                if var is not None and var.X > 0.5:
-                    nodes.append(("New Production Facility", lat, lon, city))
-            
-            # Build DataFrame
+            if is_guessing_mode:
+                st.divider()
+                st.subheader("📊 Results vs Your Guess")
+                
+                actual_cost = results['Objective_value']
+                error = actual_cost - guess_cost
+                error_pct = abs(error) / actual_cost * 100 if actual_cost > 0 else 0
+                
+                # Display comparison
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Your Guess", f"€{guess_cost:,.2f}")
+                
+                with col2:
+                    st.metric("Actual Cost", f"€{actual_cost:,.2f}")
+                
+                with col3:
+                    if error_pct < 5:
+                        feedback = "🎯 Excellent!"
+                    elif error_pct < 15:
+                        feedback = "✅ Good!"
+                    elif error_pct < 30:
+                        feedback = "⚠️ Close"
+                    else:
+                        feedback = "❌ Off"
+                    st.metric("Accuracy", f"{feedback}\n{error_pct:.1f}% error")
+                
+                # Show if under or over estimate
+                if error > 0:
+                    st.warning(f"You **underestimated** by €{abs(error):,.2f}")
+                else:
+                    st.info(f"You **overestimated** by €{abs(error):,.2f}")
+                
+                # Explain why
+                st.markdown(f"""
+                ### Why was the actual cost different?
+                
+                **Network Configuration:**
+                - Selected {len(selected_plants_list)} plants, {len(selected_dcs_list)} DCs, {len(selected_retailers_list)} retailers
+                - {len(selected_modes_list)} transportation modes available
+                
+                **Key Cost Drivers:**
+                - Total Transportation Cost: €{results.get('Transport_L1', 0) + results.get('Transport_L2', 0) + results.get('Transport_L3', 0):,.2f}
+                - Total Inventory Cost: €{results.get('Inventory_L1', 0) + results.get('Inventory_L2', 0) + results.get('Inventory_L3', 0):,.2f}
+                - Sourcing Cost: €{results.get('Sourcing_L1', 0):,.2f}
+                - CO₂ Costs: €{results.get('CO2_Manufacturing', 0) + results.get('CO2_Cost_L2_2', 0):,.2f}
+                
+                **Emissions Profile:**
+                - Total CO₂: {results.get('CO2_Total', 0):.2f} tons
+                """)
+                
+                # Show network summary
+                st.subheader("📍 Your Selected Network")
+                st.json({
+                    "Plants": selected_plants_list,
+                    "Crossdocks": selected_crossdocks_list,
+                    "DCs": selected_dcs_list,
+                    "Retailers": selected_retailers_list,
+                    "Modes": selected_modes_list,
+                    "L1 Modes": selected_modes_l1_list,
+                })
+
+            # ===========================================
+            # Objective + Emissions (standard view)
+            # ===========================================
+            if not is_guessing_mode:
+                st.metric("💰 Objective Value (€)", f"{results['Objective_value']:,.2f}")
+
+                st.subheader("🌿 CO₂ Emissions")
+                st.json({
+                    "Air": results.get("E_air", 0),
+                    "Sea": results.get("E_sea", 0),
+                    "Road": results.get("E_road", 0),
+                    "Last-mile": results.get("E_lastmile", 0),
+                    "Production": results.get("E_production", 0),
+                    "Total": results.get("CO2_Total", 0),
+                })
+
+                # ================================================================
+                # SHOW DETAILED VISUALIZATIONS (only if not guessing game)
+                # ================================================================
+                if not is_guessing_mode:
+                    # ===========================================
+                    # 🌍 MAP (no more pd errors!)
+                    # ===========================================
+                    st.markdown("## 🌍 Global Supply Chain Map")
+
+                    nodes = [
+                        ("Plant", 31.23, 121.47, "Shanghai"),
+                        ("Plant", 22.32, 114.17, "Hong Kong"),
+                        ("Cross-dock", 48.85, 2.35, "Paris"),
+                        ("Cross-dock", 50.11, 8.68, "Frankfurt"),
+                        ("Cross-dock", 37.98, 23.73, "Athens"),
+                        ("DC", 47.50, 19.04, "Budapest"),
+                        ("DC", 48.14, 11.58, "Munich"),
+                        ("DC", 46.95, 7.44, "Bern"),
+                        ("DC", 45.46, 9.19, "Milan"),
+                        ("Retail", 55.67, 12.57, "Copenhagen"),
+                        ("Retail", 53.35, -6.26, "Dublin"),
+                        ("Retail", 51.50, -0.12, "London"),
+                        ("Retail", 49.82, 19.08, "Krakow"),
+                        ("Retail", 45.76, 4.83, "Lyon"),
+                        ("Retail", 43.30, 5.37, "Marseille"),
+                        ("Retail", 40.42, -3.70, "Madrid"),
+                    ]
+
+                    locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+
+                    # ================================================================
+                    # 🌍 FULL GLOBAL MAP (with new facilities + events)
+                    # ================================================================
+                    
+                    # New facilities (only if active)
+                    facility_coords = {
+                        "HUDTG": (49.61, 6.13, "Luxembourg"),
+                        "CZMCT": (44.83, 20.42, "Belgrade"),
+                        "IEILG": (47.09, 16.37, "Graz"),
+                        "FIMPF": (50.45, 14.50, "Prague"),
+                        "PLZCA": (42.70, 12.65, "Viterbo"),
+                    }
+                    
+                    for name, (lat, lon, city) in facility_coords.items():
+                        var = model.getVarByName(f"f2_2_bin[{name}]")
+                        if var is not None and var.X > 0.5:
+                            nodes.append(("New Production Facility", lat, lon, city))
+                    
+                    # Build DataFrame
             locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
             
             # ================================================================
@@ -503,6 +704,9 @@ if st.button("Run Optimization"):
             
                 st.markdown("#### 🚚 Cross-dock Outbound Table")
                 st.dataframe(df_crossdock.round(2), use_container_width=True)
+
+                else:
+                    st.info("💡 In guessing game mode, detailed visualizations are hidden. Focus on comparing your guess with the actual cost!")
 
 
         except Exception as e:
