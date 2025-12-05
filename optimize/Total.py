@@ -1,977 +1,772 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Nov 28 15:50:25 2025
-
-@author: LENOVO
+Multi-Layer Supply Chain Optimization with Interactive Map Selection
+Includes map-based location selection and parametric modes for all layers
 """
 
-# ================================================================
-#  merged_app.py (FINAL)
-# ================================================================
-
-import os
-import random
-import re
 import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
 import plotly.express as px
-import streamlit.components.v1 as components
-import gurobipy as gp
+from datetime import datetime
+import random
+from streamlit import components
 
-from sc1_app import run_sc1
-from sc2_app import run_sc2
-from Scenario_Setting_For_SC1F import run_scenario as run_SC1F
-from Scenario_Setting_For_SC2F import run_scenario as run_SC2F
+# Import the parametric master model
+from MASTER import run_scenario_master
 
 # ================================================================
-# PAGE CONFIG (only once!)
+# PAGE CONFIGURATION
 # ================================================================
 st.set_page_config(
-    page_title="Supply Chain Suite",
+    page_title="Supply Chain Optimization",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ================================================================
-# SIDEBAR NAVIGATION WITH COLLAPSIBLE GROUPS
+# LOCATION DATA WITH COORDINATES FOR MAP
 # ================================================================
-st.sidebar.title("📌 Navigation")
-
-# Collapsible "Factory Model" group
-with st.sidebar.expander("🏭 Factory Model", expanded=True):
-    factory_choice = st.radio(
-        "Select model:",
-        [
-            "SC1 – Existing Facilities",
-            "SC2 – New Facilities"
-        ],
-        index=None,
-        key="factory_radio"
-    )
-
-# Collapsible "Optimization" group
-with st.sidebar.expander("📊 Optimization", expanded=True):
-    opt_choice = st.radio(
-        "Select:",
-        ["Optimization Dashboard", "🎮 Guessing Game"],
-        index=None,
-        key="optimization_radio"
-    )
-
-# ================================================================
-# ROUTING LOGIC
-# ================================================================
-if factory_choice == "SC1 – Existing Facilities":
-    run_sc1()
-    st.stop()
-
-elif factory_choice == "SC2 – New Facilities":
-    run_sc2()
-    st.stop()
-
-elif opt_choice == "Optimization Dashboard":
-    pass  # Continue into optimization block below
-
-elif opt_choice == "🎮 Guessing Game":
-    pass  # Continue into guessing game block below
-
-else:
-    st.write("👈 Select a page from the Navigation menu.")
-    st.stop()
-
-# ================================================================
-# CHECK WHICH MODE: OPTIMIZATION vs GUESSING GAME
-# ================================================================
-if opt_choice == "🎮 Guessing Game":
-    is_guessing_mode = True
-else:
-    is_guessing_mode = False
-
-# ================================================================
-# OPTIMIZATION DASHBOARD & GUESSING GAME (unified)
-# ================================================================
-
-if is_guessing_mode:
-    st.title("🎮 Supply Chain Guessing Game")
-    st.markdown("""
-    **Welcome to the Guessing Game!**
+LOCATION_COORDS = {
+    # Plants (Layer 1 - Source)
+    "TW": {"name": "Taiwan Plant", "lat": 25.0330, "lon": 121.5654, "type": "plant", "layer": 1},
+    "SHA": {"name": "Shanghai Plant", "lat": 31.2304, "lon": 121.4737, "type": "plant", "layer": 1},
     
-    In this mode, you will:
-    1. Make strategic selections for locations and transportation modes
-    2. Set CO₂ and service level targets
-    3. Submit your GUESS at what the optimal cost will be
-    4. Then reveal the actual optimization result
-    5. See how close your estimate was!
+    # Crossdocks (Layer 2)
+    "ATVIE": {"name": "Vienna Crossdock", "lat": 48.2082, "lon": 16.3738, "type": "crossdock", "layer": 2},
+    "PLGDN": {"name": "Gdańsk Crossdock", "lat": 54.3900, "lon": 18.6453, "type": "crossdock", "layer": 2},
+    "FRCDG": {"name": "Friedrichshafen Crossdock", "lat": 47.6560, "lon": 9.1759, "type": "crossdock", "layer": 2},
     
-    This helps you understand supply chain trade-offs and build intuition about cost drivers.
-    """)
-else:
-    st.title("🌍 Global Supply Chain Optimization (Gurobi)")
-
-# ------------------------------------------------------------
-# Google Analytics Injection (safe)
-# ------------------------------------------------------------
-GA_MEASUREMENT_ID = "G-78BY82MRZ3"
-
-components.html(f"""
-<script>
-(function() {{
-    const targetDoc = window.parent.document;
-
-    const old1 = targetDoc.getElementById("ga-tag");
-    const old2 = targetDoc.getElementById("ga-src");
-    if (old1) old1.remove();
-    if (old2) old2.remove();
-
-    const s1 = targetDoc.createElement('script');
-    s1.id = "ga-src";
-    s1.async = true;
-    s1.src = "https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}";
-    targetDoc.head.appendChild(s1);
-
-    const s2 = targetDoc.createElement('script');
-    s2.id = "ga-tag";
-    s2.innerHTML = `
-        window.dataLayer = window.dataLayer || [];
-        function gtag() {{ dataLayer.push(arguments); }}
-        gtag('js', new Date());
-        gtag('config', '{GA_MEASUREMENT_ID}', {{
-            send_page_view: true
-        }});
-    `;
-    targetDoc.head.appendChild(s2);
-
-    console.log("GA injected successfully");
-}})();
-</script>
-""", height=0)
-
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
-def positive_input(label, default):
-    """Clean numeric input helper."""
-    val_str = st.text_input(label, value=str(default))
-    try:
-        val = float(val_str)
-        return max(val, 0)
-    except:
-        st.warning(f"{label} must be numeric. Using {default}.")
-        return default
-
-# ================================================================
-# PARAMETRIC LOCATION & MODE SELECTION (for Guessing Game)
-# ================================================================
-selected_plants_list = None
-selected_crossdocks_list = None
-selected_dcs_list = None
-selected_retailers_list = None
-selected_new_locs_list = None
-selected_modes_list = None
-selected_modes_l1_list = None
-
-if is_guessing_mode:
-    st.subheader("📍 Select Your Supply Chain Network")
-    st.markdown("Choose which locations and modes to include in your optimized network:")
+    # Distribution Centers (Layer 3)
+    "PED": {"name": "Pécs DC", "lat": 46.0727, "lon": 18.2315, "type": "dc", "layer": 3},
+    "FR6216": {"name": "Frankfurt DC", "lat": 50.1109, "lon": 8.6821, "type": "dc", "layer": 3},
+    "RIX": {"name": "Riga DC", "lat": 56.9496, "lon": 24.1052, "type": "dc", "layer": 3},
+    "GMZ": {"name": "Graz DC", "lat": 47.0707, "lon": 15.4395, "type": "dc", "layer": 3},
     
-    # Available options
-    all_plants = ["TW", "SHA"]
-    all_crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
-    all_dcs = ["PED", "FR6216", "RIX", "GMZ"]
-    all_retailers = ["FLUXC", "ALKFM", "KSJER", "GXEQH", "OAHLE", "ISNQE", "NAAVF"]
-    all_modes = ["air", "sea", "road"]
+    # Retailers (Layer 4 - Demand)
+    "FLUXC": {"name": "FLUXC Retail", "lat": 52.5200, "lon": 13.4050, "type": "retailer", "layer": 4},
+    "ALKFM": {"name": "ALKFM Retail", "lat": 48.8566, "lon": 2.3522, "type": "retailer", "layer": 4},
+    "KSJER": {"name": "KSJER Retail", "lat": 50.0755, "lon": 14.4378, "type": "retailer", "layer": 4},
+    "GXEQH": {"name": "GXEQH Retail", "lat": 47.5162, "lon": 19.0402, "type": "retailer", "layer": 4},
+    "OAHLE": {"name": "OAHLE Retail", "lat": 59.9139, "lon": 10.7522, "type": "retailer", "layer": 4},
+    "ISNQE": {"name": "ISNQE Retail", "lat": 54.9973, "lon": 57.5186, "type": "retailer", "layer": 4},
+    "NAAVF": {"name": "NAAVF Retail", "lat": 55.7558, "lon": 37.6173, "type": "retailer", "layer": 4},
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**Plants (Sourcing)**")
-        selected_plants_list = st.multiselect(
-            "Plants:", all_plants, default=all_plants, key="param_plants"
-        )
-        
-        st.markdown("**Crossdocks**")
-        selected_crossdocks_list = st.multiselect(
-            "Crossdocks:", all_crossdocks, default=all_crossdocks, key="param_cd"
-        )
-    
-    with col2:
-        st.markdown("**Distribution Centers**")
-        selected_dcs_list = st.multiselect(
-            "DCs:", all_dcs, default=all_dcs, key="param_dcs"
-        )
-        
-        st.markdown("**Retailers (Markets)**")
-        selected_retailers_list = st.multiselect(
-            "Retailers:", all_retailers, default=all_retailers[:3], key="param_retail"
-        )
-    
-    with col3:
-        st.markdown("**Transportation Modes**")
-        selected_modes_list = st.multiselect(
-            "Modes:", all_modes, default=all_modes, key="param_modes"
-        )
-        
-        st.markdown("**Modes for Layer 1 (International)**")
-        selected_modes_l1_list = st.multiselect(
-            "Modes L1:", all_modes, default=["air", "sea"], key="param_modes_l1"
-        )
-    
-    # Show network summary
-    st.info(f"""
-    **Network Summary:**
-    - Plants: {', '.join(selected_plants_list) if selected_plants_list else 'None'}
-    - Crossdocks: {', '.join(selected_crossdocks_list) if selected_crossdocks_list else 'None'}
-    - DCs: {', '.join(selected_dcs_list) if selected_dcs_list else 'None'}
-    - Retailers: {', '.join(selected_retailers_list) if selected_retailers_list else 'None'}
-    - Modes: {', '.join(selected_modes_list) if selected_modes_list else 'None'}
-    """)
-
-# ------------------------------------------------------------
-# Mode selection (Normal vs Session)
-# ------------------------------------------------------------
-if not is_guessing_mode:
-    mode = st.radio("Select mode:", ["Normal Mode", "Session Mode"])
-else:
-    mode = "Normal Mode"  # Guessing game always uses Normal Mode
-
-if "session_step" not in st.session_state:
-    st.session_state.session_step = 0
-
-EVENTS = {
-    "suez_canal": "🚢 Suez Canal is blocked.",
-    "oil_crises": "⛽ Oil crisis increases energy cost.",
-    "trade_war": "💼 Trade war increases tariffs.",
+    # New Locations (Layer 5)
+    "HUDTG": {"name": "Luxembourg New Hub", "lat": 49.6116, "lon": 6.1319, "type": "new", "layer": 5},
+    "CZMCT": {"name": "Belgrade New Hub", "lat": 44.8176, "lon": 20.4633, "type": "new", "layer": 5},
+    "IEILG": {"name": "Graz New Hub", "lat": 47.0707, "lon": 15.4395, "type": "new", "layer": 5},
+    "FIMPF": {"name": "Prague New Hub", "lat": 50.0755, "lon": 14.4378, "type": "new", "layer": 5},
+    "PLZCA": {"name": "Viterbo New Hub", "lat": 42.4305, "lon": 12.1067, "type": "new", "layer": 5},
 }
 
-suez_flag = oil_flag = volcano_flag = trade_flag = False
-tariff_rate_used = 1.0
-
-def generate_tariff_rate():
-    k = random.uniform(1, 2)
-    x_pct = ((k - 1) / k) * 100
-    return k, x_pct
-
-# ------------------------------------------------------------
-# SESSION MODE LOGIC
-# ------------------------------------------------------------
-if mode == "Session Mode":
-
-    st.subheader("🎮 Scenario-based Simulation")
-
-    if "remaining_events" not in st.session_state:
-        st.session_state.remaining_events = list(EVENTS.keys())
-
-    if st.button("Start / Continue Session"):
-        if len(st.session_state.remaining_events) == 0:
-            st.success("🎉 All scenarios completed!")
-        else:
-            chosen = random.choice(st.session_state.remaining_events)
-            st.session_state.remaining_events.remove(chosen)
-            st.session_state.active_event = chosen
-
-            if chosen == "trade_war":
-                k, pct = generate_tariff_rate()
-                st.session_state.tariff_rate_random = k
-                st.session_state.tariff_x_pct = pct
-
-    if "active_event" in st.session_state:
-        ev = st.session_state.active_event
-        st.warning(EVENTS[ev])
-
-        if ev == "trade_war":
-            st.info(f"Tariffs increased by **{st.session_state.tariff_x_pct:.1f}%**")
-
-        st.text_area("Comment:", placeholder="Your decision reasoning...")
-
-    suez_flag = (st.session_state.get("active_event") == "suez_canal")
-    oil_flag = (st.session_state.get("active_event") == "oil_crises")
-    volcano_flag = (st.session_state.get("active_event") == "volcano")
-    trade_flag = (st.session_state.get("active_event") == "trade_war")
-    tariff_rate_used = st.session_state.get("tariff_rate_random", 1.0)
-
-# ------------------------------------------------------------
-# Parameter Inputs
-# ------------------------------------------------------------
-st.subheader("📊 Scenario Parameters")
-
-co2_pct = positive_input("CO₂ Reduction Target (%)", 50.0) / 100
-service_level = positive_input("Service Level", 0.9)
-
-model_choice = st.selectbox(
-    "Optimization model:",
-    ["SC1F – Existing Facilities Only", "SC2F – Allow New Facilities"]
-)
-
-if "SC1F" in model_choice:
-    co2_cost_per_ton = positive_input("CO₂ Cost per ton (€)", 37.5)
-else:
-    co2_cost_per_ton_New = positive_input("CO₂ Cost per ton (New Facility)", 60)
+# All available options
+ALL_PLANTS = ["TW", "SHA"]
+ALL_CROSSDOCKS = ["ATVIE", "PLGDN", "FRCDG"]
+ALL_DCS = ["PED", "FR6216", "RIX", "GMZ"]
+ALL_RETAILERS = ["FLUXC", "ALKFM", "KSJER", "GXEQH", "OAHLE", "ISNQE", "NAAVF"]
+ALL_NEW_LOCS = ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]
+ALL_MODES_L1 = ["air", "sea"]
+ALL_MODES_L2 = ["air", "sea", "road"]
+ALL_MODES_L3 = ["air", "sea", "road"]
 
 # ================================================================
-# GUESSING GAME: GUESS PHASE
+# HELPER FUNCTIONS
 # ================================================================
-if is_guessing_mode:
-    st.divider()
-    st.subheader("🎯 Make Your Guess")
-    st.markdown("""
-    Based on your network selections and parameters above, **estimate what you think the 
-    optimal total cost will be** for this supply chain configuration.
+
+def create_interactive_map(locations_to_show, title="Supply Chain Network Map"):
+    """
+    Create interactive Plotly map with selectable location markers
+    Returns the figure and allows click-based selection
+    """
+    if not locations_to_show:
+        st.warning("No locations to display")
+        return None
     
-    Consider:
-    - Number of facilities (more facilities = more costs)
-    - Transportation modes (air = expensive, sea = cheap)
-    - Service level (higher = inventory costs)
-    - CO₂ constraints (stricter = must use expensive clean modes)
-    """)
+    # Prepare data
+    map_data = []
+    for loc_code in locations_to_show:
+        if loc_code in LOCATION_COORDS:
+            loc = LOCATION_COORDS[loc_code]
+            map_data.append({
+                "code": loc_code,
+                "name": loc["name"],
+                "lat": loc["lat"],
+                "lon": loc["lon"],
+                "type": loc["type"]
+            })
     
-    guess_cost = st.number_input(
-        "Your cost estimate (€):",
-        min_value=0.0,
-        value=500000.0,
-        step=10000.0,
-        key="guess_input"
+    df_map = pd.DataFrame(map_data)
+    
+    if df_map.empty:
+        return None
+    
+    # Color scheme
+    color_map = {
+        "plant": "#E74C3C",        # Red
+        "crossdock": "#3498DB",    # Blue
+        "dc": "#2ECC71",           # Green
+        "retailer": "#F39C12",     # Orange
+        "new": "#9B59B6"           # Purple
+    }
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add traces for each location type
+    for loc_type in ["plant", "crossdock", "dc", "retailer", "new"]:
+        df_type = df_map[df_map["type"] == loc_type]
+        if len(df_type) > 0:
+            fig.add_trace(go.Scattergeo(
+                lon=df_type["lon"],
+                lat=df_type["lat"],
+                mode="markers+text",
+                text=df_type["code"],
+                textposition="top center",
+                textfont=dict(size=10, color="black"),
+                marker=dict(
+                    size=18,
+                    color=color_map.get(loc_type, "#95A5A6"),
+                    opacity=0.85,
+                    line=dict(width=2, color="white"),
+                    symbol="circle"
+                ),
+                name=loc_type.replace("_", " ").title(),
+                hovertemplate="<b>%{customdata[0]}</b><br>" +
+                            "Name: %{customdata[1]}<br>" +
+                            "Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<extra></extra>",
+                customdata=df_type[["code", "name"]].values,
+                showlegend=True
+            ))
+    
+    # Update layout
+    fig.update_layout(
+        title=title,
+        geo=dict(
+            scope="europe",
+            projection_type="natural earth",
+            showland=True,
+            landcolor="rgb(240, 240, 240)",
+            coastcolor="rgb(180, 180, 180)",
+            countrycolor="rgb(200, 200, 200)",
+            showlakes=True,
+            lakecolor="rgb(220, 240, 255)",
+            showocean=True,
+            oceancolor="rgb(240, 250, 255)",
+            resolution=50
+        ),
+        height=500,
+        hovermode="closest",
+        margin=dict(l=0, r=0, t=40, b=0)
     )
     
-    st.write(f"**Your Guess: €{guess_cost:,.2f}**")
+    return fig
 
-# ------------------------------------------------------------
-# RUN OPTIMIZATION
-# ------------------------------------------------------------
-button_label = "Reveal Answer" if is_guessing_mode else "Run Optimization"
+def positive_input(label, default=100, key=None):
+    """Helper for numeric inputs"""
+    return st.number_input(label, value=default, min_value=0.0, step=10.0, key=key)
 
-if st.button(button_label):
-    with st.spinner("⚙ Optimizing with Gurobi..."):
-        try:
-            # Prepare parameters based on selections
-            opt_params = {
-                "CO_2_percentage": co2_pct,
-                "suez_canal": suez_flag,
-                "oil_crises": oil_flag,
-                "volcano": volcano_flag,
-                "trade_war": trade_flag,
-                "tariff_rate": tariff_rate_used,
-                "print_results": "NO",
-                "service_level": service_level,
-            }
-            
-            # Add parametric selections for guessing game
-            if is_guessing_mode:
-                opt_params["selected_plants"] = selected_plants_list
-                opt_params["selected_crossdocks"] = selected_crossdocks_list
-                opt_params["selected_dcs"] = selected_dcs_list
-                opt_params["selected_retailers"] = selected_retailers_list
-                opt_params["selected_modes"] = selected_modes_list
-                opt_params["selected_modes_l1"] = selected_modes_l1_list
-            
-            if "SC1F" in model_choice:
-                opt_params["co2_cost_per_ton"] = co2_cost_per_ton
-                from MASTER import run_scenario_master
-                results, model = run_scenario_master(**opt_params)
+def display_layer_summary(layer_num, source_locs, target_locs, modes):
+    """Display a summary of layer configuration"""
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        st.write(f"**Sources ({len(source_locs)}):**")
+        for loc in source_locs[:3]:
+            st.caption(f"🔴 {LOCATION_COORDS.get(loc, {}).get('name', loc)}")
+        if len(source_locs) > 3:
+            st.caption(f"... +{len(source_locs)-3} more")
+    
+    with col2:
+        st.write(f"**Targets ({len(target_locs)}):**")
+        for loc in target_locs[:3]:
+            st.caption(f"🟢 {LOCATION_COORDS.get(loc, {}).get('name', loc)}")
+        if len(target_locs) > 3:
+            st.caption(f"... +{len(target_locs)-3} more")
+    
+    with col3:
+        st.write(f"**Modes ({len(modes)}):**")
+        for mode in modes:
+            if mode == "air":
+                st.caption(f"✈️ {mode}")
+            elif mode == "sea":
+                st.caption(f"🚢 {mode}")
             else:
-                opt_params["co2_cost_per_ton_New"] = co2_cost_per_ton_New
-                from MASTER import run_scenario_master
-                results, model = run_scenario_master(**opt_params)
+                st.caption(f"🚚 {mode}")
 
-            st.success("Optimization complete! ✅")
+# ================================================================
+# MAIN APPLICATION
+# ================================================================
 
-            # ================================================================
-            # GUESSING GAME: RESULTS & FEEDBACK
-            # ================================================================
-            if is_guessing_mode:
-                st.divider()
-                st.subheader("📊 Results vs Your Guess")
-                
-                actual_cost = results['Objective_value']
-                error = actual_cost - guess_cost
-                error_pct = abs(error) / actual_cost * 100 if actual_cost > 0 else 0
-                
-                # Display comparison
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("Your Guess", f"€{guess_cost:,.2f}")
-                
-                with col2:
-                    st.metric("Actual Cost", f"€{actual_cost:,.2f}")
-                
-                with col3:
-                    if error_pct < 5:
-                        feedback = "🎯 Excellent!"
-                    elif error_pct < 15:
-                        feedback = "✅ Good!"
-                    elif error_pct < 30:
-                        feedback = "⚠️ Close"
-                    else:
-                        feedback = "❌ Off"
-                    st.metric("Accuracy", f"{feedback}\n{error_pct:.1f}% error")
-                
-                # Show if under or over estimate
-                if error > 0:
-                    st.warning(f"You **underestimated** by €{abs(error):,.2f}")
-                else:
-                    st.info(f"You **overestimated** by €{abs(error):,.2f}")
-                
-                # Explain why
-                st.markdown(f"""
-                ### Why was the actual cost different?
-                
-                **Network Configuration:**
-                - Selected {len(selected_plants_list)} plants, {len(selected_dcs_list)} DCs, {len(selected_retailers_list)} retailers
-                - {len(selected_modes_list)} transportation modes available
-                
-                **Key Cost Drivers:**
-                - Total Transportation Cost: €{results.get('Transport_L1', 0) + results.get('Transport_L2', 0) + results.get('Transport_L3', 0):,.2f}
-                - Total Inventory Cost: €{results.get('Inventory_L1', 0) + results.get('Inventory_L2', 0) + results.get('Inventory_L3', 0):,.2f}
-                - Sourcing Cost: €{results.get('Sourcing_L1', 0):,.2f}
-                - CO₂ Costs: €{results.get('CO2_Manufacturing', 0) + results.get('CO2_Cost_L2_2', 0):,.2f}
-                
-                **Emissions Profile:**
-                - Total CO₂: {results.get('CO2_Total', 0):.2f} tons
-                """)
-                
-                # Show network summary
-                st.subheader("📍 Your Selected Network")
-                st.json({
-                    "Plants": selected_plants_list,
-                    "Crossdocks": selected_crossdocks_list,
-                    "DCs": selected_dcs_list,
-                    "Retailers": selected_retailers_list,
-                    "Modes": selected_modes_list,
-                    "L1 Modes": selected_modes_l1_list,
-                })
+st.title("🌍 Multi-Layer Supply Chain Optimizer")
+st.markdown("**Interactive map-based location selection with parametric modes for each layer**")
 
-            # ===========================================
-            # Objective + Emissions (standard view)
-            # ===========================================
-            if not is_guessing_mode:
-                st.metric("💰 Objective Value (€)", f"{results['Objective_value']:,.2f}")
+# Initialize session state
+if "selected_plants" not in st.session_state:
+    st.session_state.selected_plants = ALL_PLANTS.copy()
+if "selected_crossdocks" not in st.session_state:
+    st.session_state.selected_crossdocks = ALL_CROSSDOCKS.copy()
+if "selected_dcs" not in st.session_state:
+    st.session_state.selected_dcs = ALL_DCS.copy()
+if "selected_retailers" not in st.session_state:
+    st.session_state.selected_retailers = ALL_RETAILERS.copy()
+if "selected_new_locs" not in st.session_state:
+    st.session_state.selected_new_locs = []
+if "selected_modes_l1" not in st.session_state:
+    st.session_state.selected_modes_l1 = ALL_MODES_L1.copy()
+if "selected_modes_l2" not in st.session_state:
+    st.session_state.selected_modes_l2 = ALL_MODES_L2.copy()
+if "selected_modes_l3" not in st.session_state:
+    st.session_state.selected_modes_l3 = ALL_MODES_L3.copy()
 
-                st.subheader("🌿 CO₂ Emissions")
-                st.json({
-                    "Air": results.get("E_air", 0),
-                    "Sea": results.get("E_sea", 0),
-                    "Road": results.get("E_road", 0),
-                    "Last-mile": results.get("E_lastmile", 0),
-                    "Production": results.get("E_production", 0),
-                    "Total": results.get("CO2_Total", 0),
-                })
+# Sidebar mode selection
+st.sidebar.title("📋 Navigation")
+page_mode = st.sidebar.radio(
+    "Select Page:",
+    ["🏠 Home", "📊 Optimization", "🎮 Guessing Game"],
+    key="page_mode"
+)
 
-                # ================================================================
-                # SHOW DETAILED VISUALIZATIONS (only if not guessing game)
-                # ================================================================
-                if not is_guessing_mode:
-                    # ===========================================
-                    # 🌍 MAP (no more pd errors!)
-                    # ===========================================
-                    st.markdown("## 🌍 Global Supply Chain Map")
+# ================================================================
+# HOME PAGE
+# ================================================================
 
-                    nodes = [
-                        ("Plant", 31.23, 121.47, "Shanghai"),
-                        ("Plant", 22.32, 114.17, "Hong Kong"),
-                        ("Cross-dock", 48.85, 2.35, "Paris"),
-                        ("Cross-dock", 50.11, 8.68, "Frankfurt"),
-                        ("Cross-dock", 37.98, 23.73, "Athens"),
-                        ("DC", 47.50, 19.04, "Budapest"),
-                        ("DC", 48.14, 11.58, "Munich"),
-                        ("DC", 46.95, 7.44, "Bern"),
-                        ("DC", 45.46, 9.19, "Milan"),
-                        ("Retail", 55.67, 12.57, "Copenhagen"),
-                        ("Retail", 53.35, -6.26, "Dublin"),
-                        ("Retail", 51.50, -0.12, "London"),
-                        ("Retail", 49.82, 19.08, "Krakow"),
-                        ("Retail", 45.76, 4.83, "Lyon"),
-                        ("Retail", 43.30, 5.37, "Marseille"),
-                        ("Retail", 40.42, -3.70, "Madrid"),
-                    ]
+if page_mode == "🏠 Home":
+    st.header("Welcome to Multi-Layer Supply Chain Optimization")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📊 Optimization Mode")
+        st.write("""
+        - Select locations and modes for each distribution layer
+        - View interactive world maps with all facilities
+        - Run Gurobi optimization across all layers
+        - Analyze costs, emissions, and demand fulfillment
+        """)
+        if st.button("Go to Optimization →", key="btn_opt", use_container_width=True):
+            st.session_state.page_mode = "📊 Optimization"
+            st.rerun()
+    
+    with col2:
+        st.subheader("🎮 Guessing Game")
+        st.write("""
+        - Make educated guesses for each layer
+        - Test your supply chain intuition
+        - Compare against optimal solutions
+        - Learn how optimization improves performance
+        """)
+        if st.button("Go to Guessing Game →", key="btn_guess", use_container_width=True):
+            st.session_state.page_mode = "🎮 Guessing Game"
+            st.rerun()
+    
+    st.markdown("---")
+    st.info("""
+    **Layer Structure:**
+    - **Layer 1**: Plants → Crossdocks (Int'l modes: air, sea)
+    - **Layer 2**: Crossdocks → Distribution Centers (modes: air, sea, road)
+    - **Layer 3**: DCs → Retailers (modes: air, sea, road)
+    
+    Each layer has independent mode selection for flexible optimization!
+    """)
 
-                    locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
+# ================================================================
+# OPTIMIZATION PAGE
+# ================================================================
 
-                    # ================================================================
-                    # 🌍 FULL GLOBAL MAP (with new facilities + events)
-                    # ================================================================
-                    
-                    # New facilities (only if active)
-                    facility_coords = {
-                        "HUDTG": (49.61, 6.13, "Luxembourg"),
-                        "CZMCT": (44.83, 20.42, "Belgrade"),
-                        "IEILG": (47.09, 16.37, "Graz"),
-                        "FIMPF": (50.45, 14.50, "Prague"),
-                        "PLZCA": (42.70, 12.65, "Viterbo"),
-                    }
-                    
-                    for name, (lat, lon, city) in facility_coords.items():
-                        var = model.getVarByName(f"f2_2_bin[{name}]")
-                        if var is not None and var.X > 0.5:
-                            nodes.append(("New Production Facility", lat, lon, city))
-                    
-                    # Build DataFrame
-                    locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
-                    
-                    # ================================================================
-                    # Add EVENT MARKERS to the map
-                    # ================================================================
-                    event_nodes = []
-                    
-                    if suez_flag:
-                        event_nodes.append(("Event: Suez Canal Blockade", 30.59, 32.27, "Suez Canal Crisis"))
-                    
-                    if volcano_flag:
-                        event_nodes.append(("Event: Volcano Eruption", 63.63, -19.62, "Volcanic Ash Zone"))
-                    
-                    if oil_flag:
-                        event_nodes.append(("Event: Oil Crisis", 28.60, 47.80, "Oil Supply Shock"))
-                    
-                    if trade_flag:
-                        event_nodes.append(("Event: Trade War", 55.00, 60.00, "Trade War Impact Zone"))
-                    
-                    if event_nodes:
-                        df_events = pd.DataFrame(event_nodes, columns=["Type", "Lat", "Lon", "City"])
-                        locations = pd.concat([locations, df_events], ignore_index=True)
-                    
-                    # ================================================================
-                    # Marker colors & sizes
-                    # ================================================================
-                    color_map = {
-                        "Plant": "purple",
-                        "Cross-dock": "dodgerblue",
-                        "Distribution Centre": "black",
-                        "Retailer Hub": "red",
-                        "New Production Facility": "deepskyblue",
-                    }
-                    
-                    color_map.update({
-                        "Event: Suez Canal Blockade": "gold",
-                        "Event: Volcano Eruption": "orange",
-                        "Event: Oil Crisis": "brown",
-                        "Event: Trade War": "green",
-                    })
-                    
-                    size_map = {
-                        "Plant": 15,
-                        "Cross-dock": 14,
-                        "Distribution Centre": 16,
-                        "Retailer Hub": 20,
-                        "New Production Facility": 14,
-                    }
-                    
-                    size_map.update({
-                        "Event: Suez Canal Blockade": 18,
-                        "Event: Volcano Eruption": 18,
-                        "Event: Oil Crisis": 18,
-                        "Event: Trade War": 18,
-                    })
-                    
-                    # ================================================================
-                    # Build MAP
-                    # ================================================================
-                    fig_map = px.scatter_geo(
-                        locations,
-                        lat="Lat",
-                        lon="Lon",
-                        color="Type",
-                        text="City",
-                        hover_name="City",
-                        color_discrete_map=color_map,
-                        projection="natural earth",
-                        scope="world",
-                        title="Global Supply Chain Structure",
-                    )
-                    
-                    # marker styling
-                    for trace in fig_map.data:
-                        trace.marker.update(
-                            size=size_map.get(trace.name, 12),
-                            opacity=0.9,
-                            line=dict(width=0.5, color="white"),
-                        )
-                    
-                    fig_map.update_geos(
-                        showcountries=True,
-                        countrycolor="lightgray",
-                        showland=True,
-                        landcolor="rgb(245,245,245)",
-                        fitbounds="locations",
-                    )
-                    
-                    fig_map.update_layout(
-                        height=600,
-                        margin=dict(l=0, r=0, t=40, b=0),
-                    )
-                    
-                    st.plotly_chart(fig_map, use_container_width=True)
-                    
-                    
-                    
-                    # ================================================================
-                    # 🏭 PRODUCTION OUTBOUND PIE CHART
-                    # ================================================================
-                    st.markdown("## 🏭 Production Outbound Breakdown")
-                    
-                    TOTAL_MARKET_DEMAND = 111000
-                    
-                    f1_vars = [v for v in model.getVars() if v.VarName.startswith("f1[")]
-                    f2_2_vars = [v for v in model.getVars() if v.VarName.startswith("f2_2[")]
-                    
-                    prod_sources = {}
-                    
-                    # Existing plants
-                    for plant in ["TW", "SHA"]:
-                        total = sum(v.X for v in f1_vars if v.VarName.startswith(f"f1[{plant},"))
-                        prod_sources[plant] = total
-                    
-                    # New EU facilities
-                    for fac in ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]:
-                        total = sum(v.X for v in f2_2_vars if v.VarName.startswith(f"f2_2[{fac},"))
-                        prod_sources[fac] = total
-                    
-                    total_produced = sum(prod_sources.values())
-                    unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
-                    
-                    labels = list(prod_sources.keys()) + ["Unmet Demand"]
-                    values = list(prod_sources.values()) + [unmet]
-                    
-                    df_prod = pd.DataFrame({"Source": labels, "Units Produced": values})
-                    
-                    fig_prod = px.pie(
-                        df_prod,
-                        names="Source",
-                        values="Units Produced",
-                        hole=0.3,
-                        title="Production Share by Source",
-                    )
-                    
-                    color_map = {name: col for name, col in zip(df_prod["Source"], px.colors.qualitative.Set2)}
-                    color_map["Unmet Demand"] = "lightgrey"
-                    
-                    fig_prod.update_traces(
-                        textinfo="label+percent",
-                        textfont_size=13,
-                        marker=dict(colors=[color_map[s] for s in df_prod["Source"]])
-                    )
-                    
-                    fig_prod.update_layout(
-                        showlegend=True,
-                        height=400,
-                        template="plotly_white",
-                        margin=dict(l=20, r=20, t=40, b=20)
-                    )
-                    
-                    st.plotly_chart(fig_prod, use_container_width=True)
-                    st.markdown("#### 📦 Production Summary Table")
-                    st.dataframe(df_prod.round(2), use_container_width=True)
-                    
-                    
-                    
-                    # ================================================================
-                    # 🚚 CROSS-DOCK OUTBOUND PIE CHART
-                    # ================================================================
-                    st.markdown("## 🚚 Cross-dock Outbound Breakdown")
-                    
-                    f2_vars = [v for v in model.getVars() if v.VarName.startswith("f2[")]
-                    
-                    crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
-                    crossdock_flows = {}
-                    
-                    for cd in crossdocks:
-                        total = sum(v.X for v in f2_vars if v.VarName.startswith(f"f2[{cd},"))
-                        crossdock_flows[cd] = total
-                    
-                    if sum(crossdock_flows.values()) == 0:
-                        st.info("No cross-dock activity.")
-                    else:
-                        df_crossdock = pd.DataFrame({
-                            "Crossdock": list(crossdock_flows.keys()),
-                            "Shipped (units)": list(crossdock_flows.values()),
-                        })
-                        df_crossdock["Share (%)"] = df_crossdock["Shipped (units)"] / df_crossdock["Shipped (units)"].sum() * 100
-                    
-                        fig_crossdock = px.pie(
-                            df_crossdock,
-                            names="Crossdock",
-                            values="Shipped (units)",
-                            hole=0.3,
-                            title="Cross-dock Outbound Share"
-                        )
-                    
-                        fig_crossdock.update_layout(
-                            showlegend=True,
-                            height=400,
-                            template="plotly_white",
-                            margin=dict(l=20, r=20, t=40, b=20),
-                        )
-                    
-                        st.plotly_chart(fig_crossdock, use_container_width=True)
-                        st.markdown("#### 🚚 Cross-dock Outbound Table")
-                        st.dataframe(df_crossdock.round(2), use_container_width=True)
-
-                else:
-                    st.info("💡 In guessing game mode, detailed visualizations are hidden. Focus on comparing your guess with the actual cost!")
-
-
-        except Exception as e:
-            st.error(f"❌ Primary optimization failed: {e}")
-            st.warning("⚠ Running fallback model to compute maximum satisfiable demand...")
+elif page_mode == "📊 Optimization":
+    st.header("⚙️ Multi-Layer Scenario Optimization")
+    
+    # Create tabs for each layer + parameters + results
+    tab_l1, tab_l2, tab_l3, tab_params, tab_results = st.tabs([
+        "🏭 Layer 1: Plants→Crossdocks",
+        "📦 Layer 2: Crossdocks→DCs",
+        "🛍️ Layer 3: DCs→Retailers",
+        "⚙️ Parameters",
+        "📊 Results"
+    ])
+    
+    # ========== LAYER 1 TAB ==========
+    with tab_l1:
+        st.subheader("Layer 1: Plants to Crossdocks (International Transport)")
+        st.markdown("*Select plants as production sources and crossdocks as consolidation points*")
         
-            try:
-                # --------------------------------------------------
-                # CHOOSE CORRECT FALLBACK MODEL
-                # --------------------------------------------------
-                if "SC2F" in model_choice:
-                    from Scenario_Setting_For_SC2F_uns import run_scenario as run_Uns
-                    results_uns, model_uns = run_Uns(
-                        CO_2_percentage=co2_pct,
-                        co2_cost_per_ton_New=co2_cost_per_ton_New,
-                        suez_canal=suez_flag,
-                        oil_crises=oil_flag,
-                        volcano=volcano_flag,
-                        trade_war=trade_flag,
-                        tariff_rate=tariff_rate_used,
-                        print_results="NO"
-                    )
-                else:
-                    from Scenario_Setting_For_SC1F_uns import run_scenario as run_Uns
-                    results_uns, model_uns = run_Uns(
-                        CO_2_percentage=co2_pct,
-                        co2_cost_per_ton=co2_cost_per_ton,
-                        suez_canal=suez_flag,
-                        oil_crises=oil_flag,
-                        volcano=volcano_flag,
-                        trade_war=trade_flag,
-                        tariff_rate=tariff_rate_used,
-                        print_results="NO"
-                    )
+        col1, col2 = st.columns([3, 1])
         
-                # --------------------------------------------------
-                # SUCCESS DISPLAY
-                # --------------------------------------------------
-                st.success("Fallback optimization successful! ✅")
-
-                # ===============================================================
-                # 🎯 MAXIMUM SATISFIABLE DEMAND
-                # ===============================================================
-                st.markdown("## 📦 Maximum Satisfiable Demand (Fallback Model)")
-                
-                st.metric(
-                    "Satisfied Demand (%)",
-                    f"{results_uns['Satisfied_Demand_pct'] * 100:.2f}%"
-                )
-                
-                st.metric(
-                    "Satisfied Demand (Units)",
-                    f"{results_uns['Satisfied_Demand_units']:,.0f}"
-                )
-                
-                # ===============================================================
-                # 💰 OBJECTIVE
-                # ===============================================================
-                st.markdown("## 💰 Objective Value (Excluding Slack Penalty)")
-                st.metric(
-                    "Objective (€)",
-                    f"{results_uns['Objective_value']:,.2f}"
-                )
-                
-                # ===============================================================
-                # 🌍 MAP
-                # ===============================================================
-                st.markdown("## 🌍 Global Supply Chain Map (Fallback Model)")
-                
-                nodes = [
-                    ("Plant", 31.23, 121.47, "Shanghai"),
-                    ("Plant", 22.32, 114.17, "Hong Kong"),
-                    ("Cross-dock", 48.85, 2.35, "Paris"),
-                    ("Cross-dock", 50.11, 8.68, "Frankfurt"),
-                    ("Cross-dock", 37.98, 23.73, "Athens"),
-                    ("DC", 47.50, 19.04, "Budapest"),
-                    ("DC", 48.14, 11.58, "Munich"),
-                    ("DC", 46.95, 7.44, "Bern"),
-                    ("DC", 45.46, 9.19, "Milan"),
-                    ("Retail", 55.67, 12.57, "Copenhagen"),
-                    ("Retail", 53.35, -6.26, "Dublin"),
-                    ("Retail", 51.50, -0.12, "London"),
-                    ("Retail", 49.82, 19.08, "Krakow"),
-                    ("Retail", 45.76, 4.83, "Lyon"),
-                    ("Retail", 43.30, 5.37, "Marseille"),
-                    ("Retail", 40.42, -3.70, "Madrid"),
-                ]
-                
-                locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
-                
-                # Add new facilities from fallback model
-                facility_coords = {
-                    "HUDTG": (49.61, 6.13, "Luxembourg"),
-                    "CZMCT": (44.83, 20.42, "Belgrade"),
-                    "IEILG": (47.09, 16.37, "Graz"),
-                    "FIMPF": (50.45, 14.50, "Prague"),
-                    "PLZCA": (42.70, 12.65, "Viterbo"),
-                }
-                
-                for name, (lat, lon, city) in facility_coords.items():
-                    var = model_uns.getVarByName(f"f2_2_bin[{name}]")
-                    if var is not None and var.X > 0.5:
-                        nodes.append(("New Production Facility", lat, lon, city))
-                
-                locations = pd.DataFrame(nodes, columns=["Type", "Lat", "Lon", "City"])
-                
-                event_nodes = []
-                
-                if suez_flag:
-                    event_nodes.append(("Event: Suez Canal Blockade", 30.59, 32.27, "Suez Canal Crisis"))
-                if volcano_flag:
-                    event_nodes.append(("Event: Volcano Eruption", 63.63, -19.62, "Volcanic Ash Zone"))
-                if oil_flag:
-                    event_nodes.append(("Event: Oil Crisis", 28.60, 47.80, "Oil Supply Shock"))
-                if trade_flag:
-                    event_nodes.append(("Event: Trade War", 55.00, 60.00, "Trade War Impact Zone"))
-                
-                if event_nodes:
-                    df_events = pd.DataFrame(event_nodes, columns=["Type", "Lat", "Lon", "City"])
-                    locations = pd.concat([locations, df_events], ignore_index=True)
-                
-                color_map = {
-                    "Plant": "purple",
-                    "Cross-dock": "dodgerblue",
-                    "Distribution Centre": "black",
-                    "Retailer Hub": "red",
-                    "New Production Facility": "deepskyblue",
-                    "Event: Suez Canal Blockade": "gold",
-                    "Event: Volcano Eruption": "orange",
-                    "Event: Oil Crisis": "brown",
-                    "Event: Trade War": "green",
-                }
-                
-                size_map = {
-                    "Plant": 15,
-                    "Cross-dock": 14,
-                    "Distribution Centre": 16,
-                    "Retailer Hub": 20,
-                    "New Production Facility": 14,
-                    "Event: Suez Canal Blockade": 18,
-                    "Event: Volcano Eruption": 18,
-                    "Event: Oil Crisis": 18,
-                    "Event: Trade War": 18,
-                }
-                
-                fig_map = px.scatter_geo(
-                    locations,
-                    lat="Lat",
-                    lon="Lon",
-                    color="Type",
-                    text="City",
-                    hover_name="City",
-                    color_discrete_map=color_map,
-                    projection="natural earth",
-                    scope="world",
-                    title="Global Supply Chain Structure (Fallback Model)",
-                )
-                
-                for trace in fig_map.data:
-                    trace.marker.update(
-                        size=size_map.get(trace.name, 12),
-                        opacity=0.9,
-                        line=dict(width=0.5, color="white"),
-                    )
-                
-                fig_map.update_geos(
-                    showcountries=True,
-                    countrycolor="lightgray",
-                    showland=True,
-                    landcolor="rgb(245,245,245)",
-                    fitbounds="locations",
-                )
-                
-                fig_map.update_layout(
-                    height=600,
-                    margin=dict(l=0, r=0, t=40, b=0),
-                )
-                
-                st.plotly_chart(fig_map, use_container_width=True)
-                
-                # ===============================================================
-                # 🏭 PRODUCTION OUTBOUND PIE CHART
-                # ===============================================================
-                st.markdown("## 🏭 Production Outbound Breakdown (Fallback Model)")
-                
-                f1_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f1[")]
-                f2_2_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f2_2[")]
-                
-                prod_sources = {}
-                
-                # Existing plants
-                for plant in ["TW", "SHA"]:
-                    total = sum(v.X for v in f1_vars if v.VarName.startswith(f"f1[{plant},"))
-                    prod_sources[plant] = total
-                
-                # New EU facilities
-                for fac in ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]:
-                    total = sum(v.X for v in f2_2_vars if v.VarName.startswith(f"f2_2[{fac},"))
-                    prod_sources[fac] = total
-                
-                TOTAL_MARKET_DEMAND = 111000
-                total_produced = sum(prod_sources.values())
-                unmet = max(TOTAL_MARKET_DEMAND - total_produced, 0)
-                
-                labels = list(prod_sources.keys()) + ["Unmet Demand"]
-                values = list(prod_sources.values()) + [unmet]
-                
-                df_prod = pd.DataFrame({"Source": labels, "Units Produced": values})
-                
-                fig_prod = px.pie(
-                    df_prod,
-                    names="Source",
-                    values="Units Produced",
-                    hole=0.3,
-                    title="Production Share by Source (Fallback Model)",
-                )
-                
-                fig_prod.update_traces(
-                    textinfo="label+percent",
-                    textfont_size=13
-                )
-                
-                st.plotly_chart(fig_prod, use_container_width=True)
-                
-                st.dataframe(df_prod.round(2), use_container_width=True)
-                
-                # ===============================================================
-                # 🚚 CROSS-DOCK OUTBOUND PIE CHART
-                # ===============================================================
-                st.markdown("## 🚚 Cross-dock Outbound Breakdown (Fallback Model)")
-                
-                f2_vars = [v for v in model_uns.getVars() if v.VarName.startswith("f2[")]
-                
-                crossdocks = ["ATVIE", "PLGDN", "FRCDG"]
-                crossdock_flows = {}
-                
-                for cd in crossdocks:
-                    total = sum(v.X for v in f2_vars if v.VarName.startswith(f"f2[{cd},"))
-                    crossdock_flows[cd] = total
-                
-                if sum(crossdock_flows.values()) == 0:
-                    st.info("No cross-dock activity.")
-                else:
-                    df_crossdock = pd.DataFrame({
-                        "Crossdock": list(crossdock_flows.keys()),
-                        "Shipped (units)": list(crossdock_flows.values()),
-                    })
-                    df_crossdock["Share (%)"] = (
-                        df_crossdock["Shipped (units)"] /
-                        df_crossdock["Shipped (units)"].sum()
-                    ) * 100
-                
-                    fig_crossdock = px.pie(
-                        df_crossdock,
-                        names="Crossdock",
-                        values="Shipped (units)",
-                        hole=0.3,
-                        title="Cross-dock Outbound Share (Fallback Model)"
-                    )
-                
-                    st.plotly_chart(fig_crossdock, use_container_width=True)
-                    st.dataframe(df_crossdock.round(2), use_container_width=True)
-                
+        with col1:
+            st.write("### Interactive Map")
+            l1_locs = st.session_state.selected_plants + st.session_state.selected_crossdocks
+            fig_l1 = create_interactive_map(l1_locs, "Layer 1: Plants & Crossdocks")
+            if fig_l1:
+                st.plotly_chart(fig_l1, use_container_width=True)
+        
+        with col2:
+            st.write("### Configure Layer 1")
+            
+            st.markdown("**Plants:**")
+            new_plants = st.multiselect(
+                "Select Plants",
+                ALL_PLANTS,
+                default=st.session_state.selected_plants,
+                key="opt_l1_plants",
+                help="Choose production sources"
+            )
+            st.session_state.selected_plants = new_plants
+            
+            st.markdown("**Crossdocks:**")
+            new_cds = st.multiselect(
+                "Select Crossdocks",
+                ALL_CROSSDOCKS,
+                default=st.session_state.selected_crossdocks,
+                key="opt_l1_crossdocks",
+                help="Choose consolidation points"
+            )
+            st.session_state.selected_crossdocks = new_cds
+            
+            st.markdown("**Transport Modes (Layer 1):**")
+            new_modes_l1 = st.multiselect(
+                "Modes for Layer 1",
+                ALL_MODES_L1,
+                default=st.session_state.selected_modes_l1,
+                key="opt_l1_modes",
+                help="Air or Sea for international transport"
+            )
+            st.session_state.selected_modes_l1 = new_modes_l1
+        
+        display_layer_summary(1, st.session_state.selected_plants, 
+                            st.session_state.selected_crossdocks, 
+                            st.session_state.selected_modes_l1)
+    
+    # ========== LAYER 2 TAB ==========
+    with tab_l2:
+        st.subheader("Layer 2: Crossdocks to Distribution Centers")
+        st.markdown("*Choose how goods move from consolidation to regional distribution*")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.write("### Interactive Map")
+            l2_locs = st.session_state.selected_crossdocks + st.session_state.selected_dcs
+            fig_l2 = create_interactive_map(l2_locs, "Layer 2: Crossdocks & DCs")
+            if fig_l2:
+                st.plotly_chart(fig_l2, use_container_width=True)
+        
+        with col2:
+            st.write("### Configure Layer 2")
+            
+            st.markdown("**Distribution Centers:**")
+            new_dcs = st.multiselect(
+                "Select DCs",
+                ALL_DCS,
+                default=st.session_state.selected_dcs,
+                key="opt_l2_dcs",
+                help="Regional distribution hubs"
+            )
+            st.session_state.selected_dcs = new_dcs
+            
+            st.markdown("**Transport Modes (Layer 2):**")
+            new_modes_l2 = st.multiselect(
+                "Modes for Layer 2",
+                ALL_MODES_L2,
+                default=st.session_state.selected_modes_l2,
+                key="opt_l2_modes",
+                help="Air, Sea, or Road for regional distribution"
+            )
+            st.session_state.selected_modes_l2 = new_modes_l2
+        
+        display_layer_summary(2, st.session_state.selected_crossdocks, 
+                            st.session_state.selected_dcs, 
+                            st.session_state.selected_modes_l2)
+    
+    # ========== LAYER 3 TAB ==========
+    with tab_l3:
+        st.subheader("Layer 3: Distribution Centers to Retailers")
+        st.markdown("*Configure final-mile delivery to end retailers*")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.write("### Interactive Map")
+            l3_locs = st.session_state.selected_dcs + st.session_state.selected_retailers
+            fig_l3 = create_interactive_map(l3_locs, "Layer 3: DCs & Retailers")
+            if fig_l3:
+                st.plotly_chart(fig_l3, use_container_width=True)
+        
+        with col2:
+            st.write("### Configure Layer 3")
+            
+            st.markdown("**Retailers (Demand Points):**")
+            new_retailers = st.multiselect(
+                "Select Retailers",
+                ALL_RETAILERS,
+                default=st.session_state.selected_retailers,
+                key="opt_l3_retailers",
+                help="End markets to serve"
+            )
+            st.session_state.selected_retailers = new_retailers
+            
+            st.markdown("**Transport Modes (Layer 3):**")
+            new_modes_l3 = st.multiselect(
+                "Modes for Layer 3",
+                ALL_MODES_L3,
+                default=st.session_state.selected_modes_l3,
+                key="opt_l3_modes",
+                help="Air, Sea, or Road for final delivery"
+            )
+            st.session_state.selected_modes_l3 = new_modes_l3
+            
+            st.markdown("**New Facilities:**")
+            new_new_locs = st.multiselect(
+                "Consider New Locations",
+                ALL_NEW_LOCS,
+                default=st.session_state.selected_new_locs,
+                key="opt_new_locs",
+                help="Optional expansion opportunities"
+            )
+            st.session_state.selected_new_locs = new_new_locs
+        
+        display_layer_summary(3, st.session_state.selected_dcs, 
+                            st.session_state.selected_retailers, 
+                            st.session_state.selected_modes_l3)
+    
+    # ========== PARAMETERS TAB ==========
+    with tab_params:
+        st.subheader("⚙️ Optimization Parameters")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            co2_pct = st.slider("CO₂ Reduction Target (%)", 0, 100, 50, key="opt_co2_pct")
+            service_level = st.slider("Service Level", 0.7, 0.99, 0.9, step=0.01, key="opt_svc_level")
+        
+        with col2:
+            model_choice = st.selectbox(
+                "Model Type",
+                ["SC1F - Existing Facilities", "SC2F - Allow New Facilities"],
+                key="opt_model"
+            )
+            tariff_rate = st.slider("Tariff Rate", 1.0, 2.0, 1.0, step=0.05, key="opt_tariff")
+        
+        st.markdown("---")
+        
+        # Run button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 RUN OPTIMIZATION", use_container_width=True, key="opt_run"):
+                with st.spinner("⏳ Optimizing multi-layer network..."):
+                    try:
+                        results = run_scenario_master(
+                            use_new_locations=("SC2F" in model_choice),
+                            allow_unmet_demand=True,
+                            selected_plants=st.session_state.selected_plants if st.session_state.selected_plants else ALL_PLANTS,
+                            selected_crossdocks=st.session_state.selected_crossdocks if st.session_state.selected_crossdocks else ALL_CROSSDOCKS,
+                            selected_dcs=st.session_state.selected_dcs if st.session_state.selected_dcs else ALL_DCS,
+                            selected_retailers=st.session_state.selected_retailers if st.session_state.selected_retailers else ALL_RETAILERS,
+                            selected_new_locs=st.session_state.selected_new_locs,
+                            selected_modes=st.session_state.selected_modes_l2 + st.session_state.selected_modes_l3,
+                            selected_modes_l1=st.session_state.selected_modes_l1,
+                            selected_modes_l2=st.session_state.selected_modes_l2,
+                            selected_modes_l3=st.session_state.selected_modes_l3,
+                            CO_2_percentage=co2_pct / 100.0,
+                            service_level=service_level,
+                            tariff_rate=tariff_rate
+                        )
+                        st.session_state.optimization_results = results
+                        st.success("✅ Optimization complete!")
+                        st.balloons()
                         
+                    except Exception as e:
+                        st.error(f"❌ Optimization failed: {str(e)}")
+    
+    # ========== RESULTS TAB ==========
+    with tab_results:
+        if "optimization_results" in st.session_state:
+            results = st.session_state.optimization_results
+            
+            st.subheader("📊 Results Summary")
+            
+            # KPI Row
+            kpi_cols = st.columns(4)
+            with kpi_cols[0]:
+                total_cost = results.get("Total_Cost_€", 0)
+                st.metric("💰 Total Cost", f"€{total_cost:,.0f}")
+            with kpi_cols[1]:
+                co2_total = results.get("CO2_Total", 0)
+                st.metric("🌱 Total CO₂", f"{co2_total:,.0f} kg")
+            with kpi_cols[2]:
+                demand_met = results.get("Demand_Fulfillment_Rate", 0)
+                st.metric("📦 Demand Met", f"{demand_met:.1f}%")
+            with kpi_cols[3]:
+                new_facs = len([k for k in results.keys() if "New_Facility" in k and results[k]])
+                st.metric("🌟 New Facilities", f"{new_facs}")
+            
+            st.markdown("---")
+            
+            # Complete Network Map
+            all_locs = (st.session_state.selected_plants + 
+                       st.session_state.selected_crossdocks + 
+                       st.session_state.selected_dcs + 
+                       st.session_state.selected_retailers)
+            
+            st.write("### Complete Supply Chain Network")
+            fig_complete = create_interactive_map(all_locs, "Full Network Visualization")
+            if fig_complete:
+                st.plotly_chart(fig_complete, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Detailed results
+            st.write("### Detailed Configuration")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.write("**Layer 1 - International**")
+                st.write(f"Mode 1: {', '.join(st.session_state.selected_modes_l1)}")
+                st.write(f"Plants: {len(st.session_state.selected_plants)}")
+                st.write(f"Crossdocks: {len(st.session_state.selected_crossdocks)}")
+            
+            with col2:
+                st.write("**Layer 2 - Regional**")
+                st.write(f"Modes: {', '.join(st.session_state.selected_modes_l2)}")
+                st.write(f"From Crossdocks: {len(st.session_state.selected_crossdocks)}")
+                st.write(f"To DCs: {len(st.session_state.selected_dcs)}")
+            
+            with col3:
+                st.write("**Layer 3 - Final-Mile**")
+                st.write(f"Modes: {', '.join(st.session_state.selected_modes_l3)}")
+                st.write(f"From DCs: {len(st.session_state.selected_dcs)}")
+                st.write(f"To Retailers: {len(st.session_state.selected_retailers)}")
         
-            except Exception as e2:
-                st.error(f"❌ Fallback model also failed: {e2}")
+        else:
+            st.info("👈 Run optimization from the Parameters tab to see results!")
 
+# ================================================================
+# GUESSING GAME PAGE
+# ================================================================
 
+elif page_mode == "🎮 Guessing Game":
+    st.header("🎮 Supply Chain Configuration Guessing Game")
+    st.markdown("**Make your best guesses for each layer and compare with optimal results!**")
+    
+    # Create tabs for each layer
+    tab_g1, tab_g2, tab_g3, tab_g_params, tab_g_results = st.tabs([
+        "🏭 Layer 1 Guess",
+        "📦 Layer 2 Guess",
+        "🛍️ Layer 3 Guess",
+        "⚙️ Your Guesses",
+        "🏆 Results"
+    ])
+    
+    # Initialize guess session state
+    if "guess_plants" not in st.session_state:
+        st.session_state.guess_plants = [ALL_PLANTS[0]]
+    if "guess_crossdocks" not in st.session_state:
+        st.session_state.guess_crossdocks = [ALL_CROSSDOCKS[0]]
+    if "guess_modes_l1" not in st.session_state:
+        st.session_state.guess_modes_l1 = ["sea"]
+    if "guess_dcs" not in st.session_state:
+        st.session_state.guess_dcs = [ALL_DCS[0]]
+    if "guess_modes_l2" not in st.session_state:
+        st.session_state.guess_modes_l2 = ["road"]
+    if "guess_retailers" not in st.session_state:
+        st.session_state.guess_retailers = [ALL_RETAILERS[0]]
+    if "guess_modes_l3" not in st.session_state:
+        st.session_state.guess_modes_l3 = ["road"]
+    
+    # ========== GUESSING LAYER 1 ==========
+    with tab_g1:
+        st.subheader("Your Layer 1 Configuration Guess")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            l1_locs = st.session_state.guess_plants + st.session_state.guess_crossdocks
+            fig_g1 = create_interactive_map(l1_locs, "Your Layer 1 Guess")
+            if fig_g1:
+                st.plotly_chart(fig_g1, use_container_width=True)
+        
+        with col2:
+            st.markdown("**Your Guess:**")
+            st.session_state.guess_plants = st.multiselect(
+                "Which Plants?",
+                ALL_PLANTS,
+                default=st.session_state.guess_plants,
+                key="guess_l1_plants"
+            )
+            st.session_state.guess_crossdocks = st.multiselect(
+                "Which Crossdocks?",
+                ALL_CROSSDOCKS,
+                default=st.session_state.guess_crossdocks,
+                key="guess_l1_cds"
+            )
+            st.session_state.guess_modes_l1 = st.multiselect(
+                "Which Modes (L1)?",
+                ALL_MODES_L1,
+                default=st.session_state.guess_modes_l1,
+                key="guess_l1_modes"
+            )
+    
+    # ========== GUESSING LAYER 2 ==========
+    with tab_g2:
+        st.subheader("Your Layer 2 Configuration Guess")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            l2_locs = st.session_state.guess_crossdocks + st.session_state.guess_dcs
+            fig_g2 = create_interactive_map(l2_locs, "Your Layer 2 Guess")
+            if fig_g2:
+                st.plotly_chart(fig_g2, use_container_width=True)
+        
+        with col2:
+            st.markdown("**Your Guess:**")
+            st.session_state.guess_dcs = st.multiselect(
+                "Which DCs?",
+                ALL_DCS,
+                default=st.session_state.guess_dcs,
+                key="guess_l2_dcs"
+            )
+            st.session_state.guess_modes_l2 = st.multiselect(
+                "Which Modes (L2)?",
+                ALL_MODES_L2,
+                default=st.session_state.guess_modes_l2,
+                key="guess_l2_modes"
+            )
+    
+    # ========== GUESSING LAYER 3 ==========
+    with tab_g3:
+        st.subheader("Your Layer 3 Configuration Guess")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            l3_locs = st.session_state.guess_dcs + st.session_state.guess_retailers
+            fig_g3 = create_interactive_map(l3_locs, "Your Layer 3 Guess")
+            if fig_g3:
+                st.plotly_chart(fig_g3, use_container_width=True)
+        
+        with col2:
+            st.markdown("**Your Guess:**")
+            st.session_state.guess_retailers = st.multiselect(
+                "Which Retailers?",
+                ALL_RETAILERS,
+                default=st.session_state.guess_retailers,
+                key="guess_l3_retail"
+            )
+            st.session_state.guess_modes_l3 = st.multiselect(
+                "Which Modes (L3)?",
+                ALL_MODES_L3,
+                default=st.session_state.guess_modes_l3,
+                key="guess_l3_modes"
+            )
+    
+    # ========== GUESSING PARAMETERS ==========
+    with tab_g_params:
+        st.subheader("⚙️ Your Parameter Guesses")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            guess_co2_pct = st.slider("CO₂ Target (%)", 0, 100, 50, key="guess_co2_pct")
+        with col2:
+            guess_svc_level = st.slider("Service Level", 0.7, 0.99, 0.9, step=0.01, key="guess_svc_level")
+        
+        st.markdown("---")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("📤 SUBMIT YOUR GUESSES", use_container_width=True, key="guess_submit"):
+                with st.spinner("Evaluating your guesses..."):
+                    try:
+                        # Your guess results
+                        guess_results = run_scenario_master(
+                            selected_plants=st.session_state.guess_plants or ALL_PLANTS,
+                            selected_crossdocks=st.session_state.guess_crossdocks or ALL_CROSSDOCKS,
+                            selected_dcs=st.session_state.guess_dcs or ALL_DCS,
+                            selected_retailers=st.session_state.guess_retailers or ALL_RETAILERS,
+                            selected_modes_l1=st.session_state.guess_modes_l1 or ALL_MODES_L1,
+                            selected_modes_l2=st.session_state.guess_modes_l2 or ALL_MODES_L2,
+                            selected_modes_l3=st.session_state.guess_modes_l3 or ALL_MODES_L3,
+                            CO_2_percentage=guess_co2_pct / 100.0,
+                            service_level=guess_svc_level
+                        )
+                        
+                        # Optimal results (all options)
+                        optimal_results = run_scenario_master(
+                            selected_plants=ALL_PLANTS,
+                            selected_crossdocks=ALL_CROSSDOCKS,
+                            selected_dcs=ALL_DCS,
+                            selected_retailers=ALL_RETAILERS,
+                            selected_modes_l1=ALL_MODES_L1,
+                            selected_modes_l2=ALL_MODES_L2,
+                            selected_modes_l3=ALL_MODES_L3,
+                            CO_2_percentage=0.5,
+                            service_level=0.9
+                        )
+                        
+                        st.session_state.guess_results = guess_results
+                        st.session_state.optimal_results = optimal_results
+                        st.success("✅ Results ready!")
+                        st.balloons()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+    
+    # ========== GUESSING RESULTS ==========
+    with tab_g_results:
+        if "guess_results" in st.session_state and "optimal_results" in st.session_state:
+            guess_res = st.session_state.guess_results
+            optimal_res = st.session_state.optimal_results
+            
+            st.subheader("🏆 Comparison Results")
+            
+            # KPI Comparison
+            kpi_data = pd.DataFrame({
+                "Metric": ["Total Cost €", "CO2 Emissions kg", "Demand Fulfillment %"],
+                "Your Guess": [
+                    guess_res.get("Total_Cost_€", 0),
+                    guess_res.get("CO2_Total", 0),
+                    guess_res.get("Demand_Fulfillment_Rate", 100)
+                ],
+                "Optimal": [
+                    optimal_res.get("Total_Cost_€", 0),
+                    optimal_res.get("CO2_Total", 0),
+                    optimal_res.get("Demand_Fulfillment_Rate", 100)
+                ]
+            })
+            
+            st.dataframe(kpi_data, use_container_width=True)
+            
+            # Scoring
+            cost_diff = abs(kpi_data.iloc[0]["Your Guess"] - kpi_data.iloc[0]["Optimal"])
+            cost_pct = (cost_diff / max(kpi_data.iloc[0]["Optimal"], 1)) * 100
+            cost_score = max(0, 100 - cost_pct)
+            
+            co2_diff = abs(kpi_data.iloc[1]["Your Guess"] - kpi_data.iloc[1]["Optimal"])
+            co2_pct = (co2_diff / max(kpi_data.iloc[1]["Optimal"], 1)) * 100
+            co2_score = max(0, 100 - co2_pct)
+            
+            overall_score = (cost_score + co2_score) / 2
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("💰 Cost Accuracy", f"{cost_score:.1f}%")
+            with col2:
+                st.metric("🌱 CO₂ Accuracy", f"{co2_score:.1f}%")
+            with col3:
+                st.metric("🏆 Overall Score", f"{overall_score:.1f}%")
+            
+            if overall_score >= 90:
+                st.success("🌟 Outstanding! Expert-level supply chain insight!")
+            elif overall_score >= 75:
+                st.info("👍 Excellent! You understand the optimization well!")
+            elif overall_score >= 60:
+                st.info("📚 Good! You're on the right track.")
+            elif overall_score >= 40:
+                st.warning("📖 Keep learning! Study layer interactions.")
+            else:
+                st.info("🎓 Great opportunity to learn about supply chain optimization!")
+        
+        else:
+            st.info("👈 Submit your guesses to see the results!")
