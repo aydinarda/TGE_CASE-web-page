@@ -228,11 +228,6 @@ page_mode = st.sidebar.radio(
     key="page_mode"
 )
 
-# Check if navigation came from Home page buttons
-if "page_mode_nav" in st.session_state:
-    page_mode = st.session_state.page_mode_nav
-    del st.session_state.page_mode_nav
-
 # ================================================================
 # HOME PAGE
 # ================================================================
@@ -251,7 +246,7 @@ if page_mode == "🏠 Home":
         - Analyze costs, emissions, and demand fulfillment
         """)
         if st.button("Go to Optimization →", key="btn_opt", use_container_width=True):
-            st.session_state.page_mode_nav = "📊 Optimization"
+            st.session_state.page_mode = "📊 Optimization"
             st.rerun()
     
     with col2:
@@ -263,7 +258,7 @@ if page_mode == "🏠 Home":
         - Learn how optimization improves performance
         """)
         if st.button("Go to Guessing Game →", key="btn_guess", use_container_width=True):
-            st.session_state.page_mode_nav = "🎮 Guessing Game"
+            st.session_state.page_mode = "🎮 Guessing Game"
             st.rerun()
     
     st.markdown("---")
@@ -462,14 +457,20 @@ elif page_mode == "📊 Optimization":
                 with st.spinner("⏳ Optimizing multi-layer network..."):
                     try:
                         results = run_scenario_master(
+                            use_new_locations=("SC2F" in model_choice),
+                            allow_unmet_demand=True,
                             selected_plants=st.session_state.selected_plants if st.session_state.selected_plants else ALL_PLANTS,
                             selected_crossdocks=st.session_state.selected_crossdocks if st.session_state.selected_crossdocks else ALL_CROSSDOCKS,
                             selected_dcs=st.session_state.selected_dcs if st.session_state.selected_dcs else ALL_DCS,
                             selected_retailers=st.session_state.selected_retailers if st.session_state.selected_retailers else ALL_RETAILERS,
-                            selected_new_locs=st.session_state.selected_new_locs if st.session_state.selected_new_locs else [],
-                            selected_modes_l1=st.session_state.selected_modes_l1 if st.session_state.selected_modes_l1 else ALL_MODES_L1,
-                            selected_modes_l2=st.session_state.selected_modes_l2 if st.session_state.selected_modes_l2 else ALL_MODES_L2,
-                            selected_modes_l3=st.session_state.selected_modes_l3 if st.session_state.selected_modes_l3 else ALL_MODES_L3
+                            selected_new_locs=st.session_state.selected_new_locs,
+                            selected_modes=st.session_state.selected_modes_l2 + st.session_state.selected_modes_l3,
+                            selected_modes_l1=st.session_state.selected_modes_l1,
+                            selected_modes_l2=st.session_state.selected_modes_l2,
+                            selected_modes_l3=st.session_state.selected_modes_l3,
+                            CO_2_percentage=co2_pct / 100.0,
+                            service_level=service_level,
+                            tariff_rate=tariff_rate
                         )
                         st.session_state.optimization_results = results
                         st.success("✅ Optimization complete!")
@@ -477,8 +478,6 @@ elif page_mode == "📊 Optimization":
                         
                     except Exception as e:
                         st.error(f"❌ Optimization failed: {str(e)}")
-                        import traceback
-                        st.write(traceback.format_exc())
     
     # ========== RESULTS TAB ==========
     with tab_results:
@@ -682,13 +681,15 @@ elif page_mode == "🎮 Guessing Game":
                     try:
                         # Your guess results
                         guess_results = run_scenario_master(
-                            selected_plants=st.session_state.guess_plants if st.session_state.guess_plants else ALL_PLANTS,
-                            selected_crossdocks=st.session_state.guess_crossdocks if st.session_state.guess_crossdocks else ALL_CROSSDOCKS,
-                            selected_dcs=st.session_state.guess_dcs if st.session_state.guess_dcs else ALL_DCS,
-                            selected_retailers=st.session_state.guess_retailers if st.session_state.guess_retailers else ALL_RETAILERS,
-                            selected_modes_l1=st.session_state.guess_modes_l1 if st.session_state.guess_modes_l1 else ALL_MODES_L1,
-                            selected_modes_l2=st.session_state.guess_modes_l2 if st.session_state.guess_modes_l2 else ALL_MODES_L2,
-                            selected_modes_l3=st.session_state.guess_modes_l3 if st.session_state.guess_modes_l3 else ALL_MODES_L3
+                            selected_plants=st.session_state.guess_plants or ALL_PLANTS,
+                            selected_crossdocks=st.session_state.guess_crossdocks or ALL_CROSSDOCKS,
+                            selected_dcs=st.session_state.guess_dcs or ALL_DCS,
+                            selected_retailers=st.session_state.guess_retailers or ALL_RETAILERS,
+                            selected_modes_l1=st.session_state.guess_modes_l1 or ALL_MODES_L1,
+                            selected_modes_l2=st.session_state.guess_modes_l2 or ALL_MODES_L2,
+                            selected_modes_l3=st.session_state.guess_modes_l3 or ALL_MODES_L3,
+                            CO_2_percentage=guess_co2_pct / 100.0,
+                            service_level=guess_svc_level
                         )
                         
                         # Optimal results (all options)
@@ -699,7 +700,9 @@ elif page_mode == "🎮 Guessing Game":
                             selected_retailers=ALL_RETAILERS,
                             selected_modes_l1=ALL_MODES_L1,
                             selected_modes_l2=ALL_MODES_L2,
-                            selected_modes_l3=ALL_MODES_L3
+                            selected_modes_l3=ALL_MODES_L3,
+                            CO_2_percentage=0.5,
+                            service_level=0.9
                         )
                         
                         st.session_state.guess_results = guess_results
@@ -709,8 +712,6 @@ elif page_mode == "🎮 Guessing Game":
                         
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
-                        import traceback
-                        st.write(traceback.format_exc())
     
     # ========== GUESSING RESULTS ==========
     with tab_g_results:
