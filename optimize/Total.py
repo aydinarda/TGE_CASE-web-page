@@ -161,7 +161,7 @@ def create_interactive_map(locations_to_show, title="Supply Chain Network Map"):
             projection_type="natural earth",
             showland=True,
             landcolor="rgb(240, 240, 240)",
-            coastcolor="rgb(180, 180, 180)",
+            coastlinecolor="rgb(180, 180, 180)",  # 
             countrycolor="rgb(200, 200, 200)",
             showlakes=True,
             lakecolor="rgb(220, 240, 255)",
@@ -169,6 +169,7 @@ def create_interactive_map(locations_to_show, title="Supply Chain Network Map"):
             oceancolor="rgb(240, 250, 255)",
             resolution=50,
         ),
+
         height=500,
         hovermode="closest",
         margin={"l": 0, "r": 0, "t": 40, "b": 0},
