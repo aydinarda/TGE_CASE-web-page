@@ -157,7 +157,7 @@ def create_interactive_map(locations_to_show, title="Supply Chain Network Map"):
             font=dict(size=18),
         ),
         geo=dict(
-            scope="europe",
+            scope="world",
             projection_type="natural earth",
             showland=True,
             landcolor="rgb(240, 240, 240)",
