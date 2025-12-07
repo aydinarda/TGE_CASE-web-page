@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-MASTER Model - Multi-Layer Parametric Supply Chain Optimization
-Supports parametric selection for all 3 layers with independent mode choices
+MASTER Model - Fully Parametric Supply Chain Optimization
+Unifies SC1F_uns (without new locations) and SC2F_uns (with new locations)
+Works identically to both reference scenarios depending on use_new_locations flag
 """
 
 from gurobipy import Model, GRB, quicksum
@@ -16,17 +17,16 @@ def run_scenario_master(
     allow_unmet_demand=True,
 
     # --- PARAMETRIC LOCATION & MODE SELECTION (ALL LAYERS) ---
-    selected_plants=None,           # Layer 1 source
-    selected_crossdocks=None,       # Layer 1->2 intermediary / Layer 2 source
-    selected_dcs=None,              # Layer 2->3 intermediary / Layer 3 source
-    selected_retailers=None,        # Layer 3 demand
-    selected_new_locs=None,         # Alternative Layer 2 source
+    selected_plants=None,
+    selected_crossdocks=None,
+    selected_dcs=None,
+    selected_retailers=None,
+    selected_new_locs=None,
     
     # Parametric modes for each layer
-    selected_modes=None,            # Global modes (fallback for layers without specific selection)
-    selected_modes_l1=None,         # Layer 1: Plant→Crossdock modes
-    selected_modes_l2=None,         # Layer 2: Crossdock→DC modes
-    selected_modes_l3=None,         # Layer 3: DC→Retailer modes
+    selected_modes_l1=None,
+    selected_modes_l2=None,
+    selected_modes_l3=None,
 
     # --- COMMON PARAMETERS ---
     dc_capacity=None,
@@ -44,10 +44,10 @@ def run_scenario_master(
     new_loc_operationCost=None,
     new_loc_CO2=None,
     co2_emission_factor=None,
-    dist1_matrix=None,              # Plant → Crossdock distances
-    dist2_matrix=None,              # Crossdock → DC distances
-    dist2_2_matrix=None,            # NewLoc → DC distances
-    dist3_matrix=None,              # DC → Retailer distances
+    dist1_matrix=None,
+    dist2_matrix=None,
+    dist2_2_matrix=None,
+    dist3_matrix=None,
     data=None,
     lastmile_unit_cost=6.25,
     lastmile_CO2_kg=2.68,
@@ -64,12 +64,9 @@ def run_scenario_master(
     service_level=0.9,
 ):
     """
-    Multi-layer parametric supply chain optimization model.
-    
-    Layers:
-    - Layer 1 (L1): Plants → Crossdocks (modes: selected_modes_l1)
-    - Layer 2 (L2): Crossdocks/NewLocs → DCs (modes: selected_modes_l2)
-    - Layer 3 (L3): DCs → Retailers (modes: selected_modes_l3)
+    Fully parametric multi-layer supply chain optimization.
+    Equivalent to SC1F_uns when use_new_locations=False
+    Equivalent to SC2F_uns when use_new_locations=True
     """
 
     # =====================================================
@@ -81,35 +78,22 @@ def run_scenario_master(
     ALL_NEW_LOCS = ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]
     ALL_DCS = ["PED", "FR6216", "RIX", "GMZ"]
     ALL_RETAILERS = ["FLUXC", "ALKFM", "KSJER", "GXEQH", "OAHLE", "ISNQE", "NAAVF"]
-    ALL_MODES = ["air", "sea", "road"]
     ALL_MODES_L1 = ["air", "sea"]
     ALL_MODES_L2 = ["air", "sea", "road"]
     ALL_MODES_L3 = ["air", "sea", "road"]
 
-    # --- PARAMETRIC SELECTION (defaults to ALL if not specified) ---
+    # --- PARAMETRIC SELECTION ---
     Plants = selected_plants if selected_plants is not None else ALL_PLANTS
     Crossdocks = selected_crossdocks if selected_crossdocks is not None else ALL_CROSSDOCKS
-    New_Locs = selected_new_locs if selected_new_locs is not None else ALL_NEW_LOCS
+    New_Locs = (selected_new_locs if selected_new_locs is not None else ALL_NEW_LOCS) if use_new_locations else []
     Dcs = selected_dcs if selected_dcs is not None else ALL_DCS
     Retailers = selected_retailers if selected_retailers is not None else ALL_RETAILERS
     
-    # Global modes fallback
-    Modes = selected_modes if selected_modes is not None else ALL_MODES
-    
-    # Layer-specific modes with smart defaults
-    ModesL1 = selected_modes_l1 if selected_modes_l1 is not None else [m for m in ALL_MODES_L1 if m in Modes]
-    ModesL2 = selected_modes_l2 if selected_modes_l2 is not None else [m for m in ALL_MODES_L2 if m in Modes]
-    ModesL3 = selected_modes_l3 if selected_modes_l3 is not None else [m for m in ALL_MODES_L3 if m in Modes]
+    ModesL1 = selected_modes_l1 if selected_modes_l1 is not None else ALL_MODES_L1
+    ModesL2 = selected_modes_l2 if selected_modes_l2 is not None else ALL_MODES_L2
+    ModesL3 = selected_modes_l3 if selected_modes_l3 is not None else ALL_MODES_L3
 
-    # Ensure at least one mode per layer
-    if not ModesL1:
-        ModesL1 = [ALL_MODES_L1[0]]
-    if not ModesL2:
-        ModesL2 = [ALL_MODES_L2[0]]
-    if not ModesL3:
-        ModesL3 = [ALL_MODES_L3[0]]
-
-    # --- COMPLETE DEFAULT DATA ---
+    # --- DEFAULT VALUES ---
     all_demand = {
         "FLUXC": 17000, "ALKFM": 9000, "KSJER": 13000,
         "GXEQH": 19000, "OAHLE": 15000, "ISNQE": 20000, "NAAVF": 18000
@@ -142,7 +126,7 @@ def run_scenario_master(
     }
     all_co2_emission_factor = {"air": 0.000971, "sea": 0.000027, "road": 0.000076}
 
-    # --- PARAMETRIC FILTER ---
+    # --- PARAMETRIC FILTERING ---
     if demand is None:
         demand = {k: all_demand[k] for k in Retailers}
     if dc_capacity is None:
@@ -164,41 +148,42 @@ def run_scenario_master(
     if new_loc_CO2 is None:
         new_loc_CO2 = {k: all_new_loc_CO2[k] for k in New_Locs}
     if co2_emission_factor is None:
-        co2_emission_factor = {k: all_co2_emission_factor[k] for k in Modes}
+        co2_emission_factor = all_co2_emission_factor
     
-    # Add layer-specific CO2 factors
-    for mode in ModesL1:
-        if mode not in co2_emission_factor:
-            co2_emission_factor[mode] = all_co2_emission_factor.get(mode, 0.000076)
-    for mode in ModesL2:
-        if mode not in co2_emission_factor:
-            co2_emission_factor[mode] = all_co2_emission_factor.get(mode, 0.000076)
-    for mode in ModesL3:
-        if mode not in co2_emission_factor:
-            co2_emission_factor[mode] = all_co2_emission_factor.get(mode, 0.000076)
-
-    service_level_dict = {m: service_level for m in Modes}
-
+    # Setup data frame with transportation costs and inventory parameters
+    service_level_dict = {m: service_level for m in ModesL2}
     average_distance = 9600
-    all_speed = {'air': 800, 'sea': 10, 'road': 40}
-    speed = {m: all_speed[m] for m in (ModesL1 + ModesL2 + ModesL3)}
+    speed = {'air': 800, 'sea': 10, 'road': 40}
     std_demand = np.std(list(demand.values()))
 
     if data is None:
-        mode_list = list(set(ModesL1 + ModesL2 + ModesL3))
-        all_data = {
+        data = {
             "transportation": ["air", "sea", "road"],
             "t (€/kg-km)": [0.0105, 0.0013, 0.0054],
         }
-        mode_indices = {m: i for i, m in enumerate(all_data["transportation"])}
-        data = {
-            "transportation": mode_list,
-            "t (€/kg-km)": [all_data["t (€/kg-km)"][mode_indices[m]] for m in mode_list],
-        }
-
-    data["h (€/unit)"] = [unit_inventory_holdingCost] * len(set(ModesL1 + ModesL2 + ModesL3))
-
+    
+    data["h (€/unit)"] = [unit_inventory_holdingCost] * 3
+    
+    # LT (days)
+    data["LT (days)"] = [
+        np.round((average_distance * (1.2 if m == "sea" else 1)) / (speed[m] * 24), 13)
+        for m in ["air", "sea", "road"]
+    ]
+    
+    # Z-scores and densities
+    z_values = [norm.ppf(service_level) for _ in range(3)]
+    phi_values = [norm.pdf(z) for z in z_values]
+    
+    data["Z-score Φ^-1(α)"] = z_values
+    data["Density φ(Φ^-1(α))"] = phi_values
+    
+    # Safety stock (from reference scenarios)
+    data["SS (€/unit)"] = [2109.25627631292, 12055.4037653689, 5711.89299799521]
+    
     product_weight_ton = product_weight / 1000.0
+    
+    df = pd.DataFrame(data).set_index("transportation")
+    tau = df["t (€/kg-km)"].to_dict()
 
     # =====================================================
     # DISTANCE MATRICES
@@ -247,67 +232,76 @@ def run_scenario_master(
     dist2_2 = dist2_2_matrix if dist2_2_matrix is not None else all_dist2_2
     dist3 = dist3_matrix if dist3_matrix is not None else all_dist3
 
-    # Filter distance matrices to selected locations
+    # Filter to selected locations
     dist1 = dist1.loc[Plants, Crossdocks]
     dist2 = dist2.loc[Crossdocks, Dcs]
-    dist2_2 = dist2_2.loc[New_Locs, Dcs]
+    if use_new_locations and len(New_Locs) > 0:
+        dist2_2 = dist2_2.loc[New_Locs, Dcs]
     dist3 = dist3.loc[Dcs, Retailers]
 
     # =====================================================
-    # GUROBI MODEL
+    # MODEL
     # =====================================================
-    model = Model("Unified_SC_Model_MultiLayer")
+    
+    model = Model("SC_Master_Model")
 
-    # Decision variables for each layer
+    # Layer 1: Plant → Crossdock
     f1 = model.addVars(
         ((p, c, mo) for p in Plants for c in Crossdocks for mo in ModesL1),
         lb=0, name="f1"
-    )  # Layer 1: Plant → Crossdock
+    )
 
+    # Layer 2: Crossdock → DC
     f2 = model.addVars(
         ((c, d, mo) for c in Crossdocks for d in Dcs for mo in ModesL2),
         lb=0, name="f2"
-    )  # Layer 2: Crossdock → DC
+    )
 
-    f2_2 = model.addVars(
-        ((c, d, mo) for c in New_Locs for d in Dcs for mo in ModesL2),
-        lb=0, name="f2_2"
-    )  # Layer 2: NewLoc → DC
+    # Layer 2_2: NewLoc → DC (only if use_new_locations=True)
+    if use_new_locations and len(New_Locs) > 0:
+        f2_2 = model.addVars(
+            ((c, d, mo) for c in New_Locs for d in Dcs for mo in ModesL2),
+            lb=0, name="f2_2"
+        )
+        f2_2_bin = model.addVars(New_Locs, vtype=GRB.BINARY, name="f2_2_bin")
+    else:
+        f2_2 = {}
+        f2_2_bin = {}
 
-    f2_2_bin = model.addVars(New_Locs, vtype=GRB.BINARY, name="f2_2_bin")
-
+    # Layer 3: DC → Retailer
     f3 = model.addVars(
         ((d, r, mo) for d in Dcs for r in Retailers for mo in ModesL3),
         lb=0, name="f3"
-    )  # Layer 3: DC → Retailer
+    )
 
-    v = model.addVars(Retailers, name="v", lb=0)  # Unmet demand
+    # Unmet demand
+    v = model.addVars(Retailers, name="v", lb=0)
 
     # =====================================================
-    # CO2 CALCULATIONS (LAYER-SPECIFIC)
+    # CO2 CALCULATIONS
     # =====================================================
 
-    # Layer 1 CO2 (Plant→Crossdock)
+    # Transport CO2
     CO2_tr_L1 = quicksum(
-        co2_emission_factor.get(mo, 0.000076) * dist1.loc[p, c] * product_weight_ton * f1[p, c, mo]
+        co2_emission_factor[mo] * dist1.loc[p, c] * product_weight_ton * f1[p, c, mo]
         for p in Plants for c in Crossdocks for mo in ModesL1
     )
 
-    # Layer 2 CO2 (Crossdock→DC)
     CO2_tr_L2 = quicksum(
-        co2_emission_factor.get(mo, 0.000076) * dist2.loc[c, d] * product_weight_ton * f2[c, d, mo]
+        co2_emission_factor[mo] * dist2.loc[c, d] * product_weight_ton * f2[c, d, mo]
         for c in Crossdocks for d in Dcs for mo in ModesL2
     )
 
-    # Layer 2_2 CO2 (NewLoc→DC)
-    CO2_tr_L2_2 = quicksum(
-        co2_emission_factor.get(mo, 0.000076) * dist2_2.loc[c, d] * product_weight_ton * f2_2[c, d, mo]
-        for c in New_Locs for d in Dcs for mo in ModesL2
-    )
+    if use_new_locations and len(New_Locs) > 0:
+        CO2_tr_L2_2 = quicksum(
+            co2_emission_factor[mo] * dist2_2.loc[c, d] * product_weight_ton * f2_2[c, d, mo]
+            for c in New_Locs for d in Dcs for mo in ModesL2
+        )
+    else:
+        CO2_tr_L2_2 = 0
 
-    # Layer 3 CO2 (DC→Retailer)
     CO2_tr_L3 = quicksum(
-        co2_emission_factor.get(mo, 0.000076) * dist3.loc[d, r] * product_weight_ton * f3[d, r, mo]
+        co2_emission_factor[mo] * dist3.loc[d, r] * product_weight_ton * f3[d, r, mo]
         for d in Dcs for r in Retailers for mo in ModesL3
     )
 
@@ -317,190 +311,464 @@ def run_scenario_master(
         for p in Plants
     ) / 1000.0
 
-    CO2_prod_L2_2 = quicksum(
-        new_loc_CO2[c] * quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
-        for c in New_Locs
-    ) / 1000.0
+    if use_new_locations and len(New_Locs) > 0:
+        CO2_prod_L2_2 = quicksum(
+            new_loc_CO2[c] * quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
+            for c in New_Locs
+        ) / 1000.0
+    else:
+        CO2_prod_L2_2 = 0
 
     LastMile_CO2 = (lastmile_CO2_kg / 1000) * quicksum(
         f3[d, r, mo] for d in Dcs for r in Retailers for mo in ModesL3
     )
 
-    Total_CO2 = (
-        CO2_prod_L1 + CO2_prod_L2_2 +
-        CO2_tr_L1 + CO2_tr_L2 + CO2_tr_L2_2 + CO2_tr_L3 +
-        LastMile_CO2
+    Total_CO2 = CO2_prod_L1 + CO2_prod_L2_2 + CO2_tr_L1 + CO2_tr_L2 + CO2_tr_L2_2 + CO2_tr_L3 + LastMile_CO2
+
+    # CO2 breakdown by mode (for output)
+    CO2_tr_L1_air = quicksum(
+        co2_emission_factor["air"] * dist1.loc[p, c] * product_weight_ton * f1[p, c, "air"]
+        for p in Plants for c in Crossdocks if "air" in ModesL1
+    )
+    CO2_tr_L1_sea = quicksum(
+        co2_emission_factor["sea"] * dist1.loc[p, c] * product_weight_ton * f1[p, c, "sea"]
+        for p in Plants for c in Crossdocks if "sea" in ModesL1
+    )
+    
+    CO2_tr_L2_air = quicksum(
+        co2_emission_factor["air"] * dist2.loc[c, d] * product_weight_ton * f2[c, d, "air"]
+        for c in Crossdocks for d in Dcs if "air" in ModesL2
+    )
+    CO2_tr_L2_sea = quicksum(
+        co2_emission_factor["sea"] * dist2.loc[c, d] * product_weight_ton * f2[c, d, "sea"]
+        for c in Crossdocks for d in Dcs if "sea" in ModesL2
+    )
+    CO2_tr_L2_road = quicksum(
+        co2_emission_factor["road"] * dist2.loc[c, d] * product_weight_ton * f2[c, d, "road"]
+        for c in Crossdocks for d in Dcs if "road" in ModesL2
+    )
+
+    CO2_tr_L3_air = quicksum(
+        co2_emission_factor["air"] * dist3.loc[d, r] * product_weight_ton * f3[d, r, "air"]
+        for d in Dcs for r in Retailers if "air" in ModesL3
+    )
+    CO2_tr_L3_sea = quicksum(
+        co2_emission_factor["sea"] * dist3.loc[d, r] * product_weight_ton * f3[d, r, "sea"]
+        for d in Dcs for r in Retailers if "sea" in ModesL3
+    )
+    CO2_tr_L3_road = quicksum(
+        co2_emission_factor["road"] * dist3.loc[d, r] * product_weight_ton * f3[d, r, "road"]
+        for d in Dcs for r in Retailers if "road" in ModesL3
     )
 
     # =====================================================
-    # COSTS (LAYER-SPECIFIC)
+    # COST CALCULATIONS
     # =====================================================
 
-    # Sourcing cost
-    Cost_Sourcing = quicksum(
+    # Transport costs by layer and mode
+    Transport_L1 = {}
+    for mo in ModesL1:
+        Transport_L1[mo] = quicksum(
+            tau[mo] * dist1.loc[p, c] * product_weight * f1[p, c, mo]
+            for p in Plants for c in Crossdocks
+        )
+    Total_Transport_L1 = quicksum(Transport_L1[mo] for mo in ModesL1)
+
+    Transport_L2 = {}
+    for mo in ModesL2:
+        Transport_L2[mo] = quicksum(
+            tau[mo] * dist2.loc[c, d] * product_weight * f2[c, d, mo]
+            for c in Crossdocks for d in Dcs
+        )
+    Total_Transport_L2 = quicksum(Transport_L2[mo] for mo in ModesL2)
+
+    if use_new_locations and len(New_Locs) > 0:
+        Transport_L2_2 = {}
+        for mo in ModesL2:
+            Transport_L2_2[mo] = quicksum(
+                tau[mo] * dist2_2.loc[c, d] * product_weight * f2_2[c, d, mo]
+                for c in New_Locs for d in Dcs
+            )
+        Total_Transport_L2_2 = quicksum(Transport_L2_2[mo] for mo in ModesL2)
+    else:
+        Transport_L2_2 = {}
+        Total_Transport_L2_2 = 0
+
+    Transport_L3 = {}
+    for mo in ModesL3:
+        Transport_L3[mo] = quicksum(
+            tau[mo] * dist3.loc[d, r] * product_weight * f3[d, r, mo]
+            for d in Dcs for r in Retailers
+        )
+    Total_Transport_L3 = quicksum(Transport_L3[mo] for mo in ModesL3)
+
+    Total_Transport = Total_Transport_L1 + Total_Transport_L2 + Total_Transport_L2_2 + Total_Transport_L3
+
+    # ================= INVENTORY COST DEFINITIONS =================
+    
+    # Layer 1
+    InvCost_L1 = {}
+    for mo in ModesL1:
+        InvCost_L1[mo] = (
+            quicksum(
+                f1[p, c, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for p in Plants for c in Crossdocks
+            )
+            + quicksum(
+                f1[p, c, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for p in Plants for c in Crossdocks
+            )
+        )
+    
+    Total_InvCost_L1 = quicksum(InvCost_L1[mo] for mo in ModesL1)
+
+    # Layer 2
+    InvCost_L2 = {}
+    for mo in ModesL2:
+        InvCost_L2[mo] = (
+            quicksum(
+                f2[c, d, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for c in Crossdocks for d in Dcs
+            )
+            + quicksum(
+                f2[c, d, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for c in Crossdocks for d in Dcs
+            )
+        )
+    
+    Total_InvCost_L2 = quicksum(InvCost_L2[mo] for mo in ModesL2)
+
+    # Layer 2_2 (only if new locations)
+    if use_new_locations and len(New_Locs) > 0:
+        InvCost_L2_2 = {}
+        for mo in ModesL2:
+            InvCost_L2_2[mo] = (
+                quicksum(
+                    f2_2[c, d, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                    for c in New_Locs for d in Dcs
+                )
+                + quicksum(
+                    f2_2[c, d, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                    for c in New_Locs for d in Dcs
+                )
+            )
+        Total_InvCost_L2_2 = quicksum(InvCost_L2_2[mo] for mo in ModesL2)
+    else:
+        Total_InvCost_L2_2 = 0
+    
+    Whole_L2 = Total_InvCost_L2 + Total_InvCost_L2_2
+
+    # Layer 3
+    InvCost_L3 = {}
+    for mo in ModesL3:
+        InvCost_L3[mo] = (
+            quicksum(
+                f3[d, r, mo] * df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                for d in Dcs for r in Retailers
+            )
+            + quicksum(
+                f3[d, r, mo] * df.loc[mo, "SS (€/unit)"] / sum(demand.values())
+                for d in Dcs for r in Retailers
+            )
+        )
+    
+    Total_InvCost_L3 = quicksum(InvCost_L3[mo] for mo in ModesL3)
+
+    Total_InvCost_Model = Total_InvCost_L1 + Whole_L2 + Total_InvCost_L3
+
+    # ======================== Sourcing & Handling ========================
+    
+    Sourcing_L1 = quicksum(
         sourcing_cost[p] * quicksum(f1[p, c, mo] for c in Crossdocks for mo in ModesL1)
         for p in Plants
     )
 
-    # Layer 1 transport cost
-    Cost_L1_Transport = quicksum(
-        data.get("t (€/kg-km)", [0.0105, 0.0013, 0.0054])[["air", "sea", "road"].index(mo) if mo in ["air", "sea", "road"] else 0] * 
-        dist1.loc[p, c] * product_weight_ton * f1[p, c, mo]
-        for p in Plants for c in Crossdocks for mo in ModesL1
-    )
-
-    # Crossdock handling
-    Cost_CD_Handling = quicksum(
-        handling_crossdock[c] * quicksum(f1[p, c, mo] for p in Plants for mo in ModesL1)
+    Handling_L2_existing = quicksum(
+        handling_crossdock[c] * quicksum(f2[c, d, mo] for d in Dcs for mo in ModesL2)
         for c in Crossdocks
     )
 
-    # Layer 2 transport cost
-    Cost_L2_Transport = quicksum(
-        data.get("t (€/kg-km)", [0.0105, 0.0013, 0.0054])[["air", "sea", "road"].index(mo) if mo in ["air", "sea", "road"] else 0] * 
-        dist2.loc[c, d] * product_weight_ton * f2[c, d, mo]
-        for c in Crossdocks for d in Dcs for mo in ModesL2
-    )
+    Handling_L2 = Handling_L2_existing
 
-    Cost_L2_2_Transport = quicksum(
-        data.get("t (€/kg-km)", [0.0105, 0.0013, 0.0054])[["air", "sea", "road"].index(mo) if mo in ["air", "sea", "road"] else 0] * 
-        dist2_2.loc[c, d] * product_weight_ton * f2_2[c, d, mo]
-        for c in New_Locs for d in Dcs for mo in ModesL2
-    )
-
-    # DC handling
-    Cost_DC_Handling = quicksum(
-        handling_dc[d] * (quicksum(f2[c, d, mo] for c in Crossdocks for mo in ModesL2) +
-                         quicksum(f2_2[c, d, mo] for c in New_Locs for mo in ModesL2))
+    Handling_L3 = quicksum(
+        handling_dc[d] * quicksum(f3[d, r, mo] for r in Retailers for mo in ModesL3)
         for d in Dcs
     )
 
-    # Layer 3 transport cost
-    Cost_L3_Transport = quicksum(
-        data.get("t (€/kg-km)", [0.0105, 0.0013, 0.0054])[["air", "sea", "road"].index(mo) if mo in ["air", "sea", "road"] else 0] * 
-        dist3.loc[d, r] * product_weight_ton * f3[d, r, mo]
-        for d in Dcs for r in Retailers for mo in ModesL3
+    # ======================== CO2 Costs ========================
+
+    CO2_Mfg = co2_cost_per_ton / 1000 * quicksum(
+        co2_prod_kg_per_unit[p] * quicksum(f1[p, c, mo] for c in Crossdocks for mo in ModesL1)
+        for p in Plants
     )
+
+    # CO2 cost for new locations (only if use_new_locations=True)
+    if use_new_locations and len(New_Locs) > 0:
+        CO2Cost_L2_2 = quicksum(
+            new_loc_CO2[c] * quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
+            * (co2_cost_per_ton_New / 1000)
+            for c in New_Locs
+        )
+    else:
+        CO2Cost_L2_2 = 0
 
     # Last-mile cost
-    Cost_LastMile = lastmile_unit_cost * quicksum(f3[d, r, mo] for d in Dcs for r in Retailers for mo in ModesL3)
-
-    # New facilities
-    Cost_NewLoc = quicksum(
-        new_loc_openingCost[c] * f2_2_bin[c] + new_loc_operationCost[c] * quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
-        for c in New_Locs
+    LastMile_Cost = lastmile_unit_cost * quicksum(
+        f3[d, r, mo] for d in Dcs for r in Retailers for mo in ModesL3
     )
 
-    # Unmet demand penalty
-    Cost_Unmet = unit_penaltycost * quicksum(v[r] for r in Retailers)
+    # =================== New Location Costs (only if use_new_locations=True) ===================
 
-    Total_Cost = (
-        Cost_Sourcing + Cost_L1_Transport + Cost_CD_Handling +
-        Cost_L2_Transport + Cost_L2_2_Transport + Cost_DC_Handling +
-        Cost_L3_Transport + Cost_LastMile + Cost_NewLoc + Cost_Unmet
-    )
+    if use_new_locations and len(New_Locs) > 0:
+        new_loc_totalCost = {
+            loc: new_loc_openingCost[loc] + new_loc_operationCost[loc]
+            for loc in new_loc_openingCost
+        }
+        new_loc_unitCost = {loc: (1 / cap) * 100000 for loc, cap in new_loc_capacity.items()}
+        
+        FixedCost_NewLocs = quicksum(
+            new_loc_totalCost[c] * f2_2_bin[c]
+            for c in New_Locs
+        )
+
+        ProdCost_NewLocs = quicksum(
+            new_loc_unitCost[c] * quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
+            for c in New_Locs
+        )
+
+        Cost_NewLocs = FixedCost_NewLocs + ProdCost_NewLocs
+    else:
+        FixedCost_NewLocs = 0
+        ProdCost_NewLocs = 0
+        Cost_NewLocs = 0
 
     # =====================================================
-    # OBJECTIVE & CONSTRAINTS
+    # CONSTRAINTS
     # =====================================================
 
-    # Objective: Minimize cost with CO2 penalty
-    model.setObjective(
-        Total_Cost + (CO_2_percentage * co2_cost_per_ton * Total_CO2 / 1000),
-        GRB.MINIMIZE
+    # Demand with slack (allow unmet demand)
+    model.addConstrs(
+        (
+            quicksum(f3[d, r, mo] for d in Dcs for mo in ModesL3) + v[r] == demand[r]
+            for r in Retailers
+        ),
+        name="DemandWithSlack"
     )
 
-    # Flow conservation constraints
-    for c in Crossdocks:
-        model.addConstr(
+    # DC balance
+    model.addConstrs(
+        (
+            quicksum(f2[c, d, mo] for c in Crossdocks for mo in ModesL2)
+            + (quicksum(f2_2[c, d, mo] for c in New_Locs for mo in ModesL2) if use_new_locations and len(New_Locs) > 0 else 0)
+            == quicksum(f3[d, r, mo] for r in Retailers for mo in ModesL3)
+            for d in Dcs
+        ),
+        name="DCBalance"
+    )
+
+    # Crossdock balance
+    model.addConstrs(
+        (
             quicksum(f1[p, c, mo] for p in Plants for mo in ModesL1) ==
             quicksum(f2[c, d, mo] for d in Dcs for mo in ModesL2)
-        )
+            for c in Crossdocks
+        ),
+        name="CrossdockBalance"
+    )
 
-    for d in Dcs:
-        model.addConstr(
-            quicksum(f2[c, d, mo] for c in Crossdocks for mo in ModesL2) +
-            quicksum(f2_2[c, d, mo] for c in New_Locs for mo in ModesL2) ==
-            quicksum(f3[d, r, mo] for r in Retailers for mo in ModesL3)
-        )
-
-    # Demand constraints
-    for r in Retailers:
-        model.addConstr(
-            quicksum(f3[d, r, mo] for d in Dcs for mo in ModesL3) + v[r] >= demand[r]
-        )
-
-    # Capacity constraints
-    for d in Dcs:
-        model.addConstr(
+    # DC capacity
+    model.addConstrs(
+        (
             quicksum(f3[d, r, mo] for r in Retailers for mo in ModesL3) <= dc_capacity[d]
-        )
+            for d in Dcs
+        ),
+        name="DCCapacity"
+    )
 
-    # New facility opening constraints
-    for c in New_Locs:
-        model.addConstr(
-            quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2) <= new_loc_capacity[c] * f2_2_bin[c]
+    # New facility capacity (only if use_new_locations=True)
+    if use_new_locations and len(New_Locs) > 0:
+        model.addConstrs(
+            (
+                quicksum(f2_2[c, d, mo] for d in Dcs for mo in ModesL2)
+                <= new_loc_capacity[c] * f2_2_bin[c]
+                for c in New_Locs
+            ),
+            name="NewFacilityCapacity"
         )
 
     # CO2 constraint
-    if CO_2_percentage > 0:
-        model.addConstr(Total_CO2 <= CO2_base)
+    model.addConstr(
+        Total_CO2 <= CO2_base * (1 - CO_2_percentage),
+        name="CO2ReductionTarget"
+    )
 
     # =====================================================
-    # OPTIMIZE
+    # SCENARIO SETTINGS
     # =====================================================
+
+    # SUEZ CANAL BLOCKADE
+    if suez_canal:
+        model.addConstrs(
+            (f1[p, c, "sea"] == 0 for p in Plants for c in Crossdocks if "sea" in ModesL1),
+            name="SeaDamage_f1"
+        )
+
+    # OIL CRISES
+    if oil_crises:
+        Total_Transport = Total_Transport * 1.3
+        LastMile_Cost = LastMile_Cost * 1.3
+
+    # VOLCANO ERUPTION
+    if volcano:
+        if "air" in ModesL1:
+            model.addConstrs(
+                (f1[p, c, "air"] == 0 for p in Plants for c in Crossdocks),
+                name="Volcano_block_f1"
+            )
+        
+        if "air" in ModesL2:
+            model.addConstrs(
+                (f2[c, d, "air"] == 0 for c in Crossdocks for d in Dcs),
+                name="Volcano_block_f2"
+            )
+        
+        if use_new_locations and len(New_Locs) > 0 and "air" in ModesL2:
+            model.addConstrs(
+                (f2_2[c, d, "air"] == 0 for c in New_Locs for d in Dcs),
+                name="Volcano_block_f2_2"
+            )
+        
+        if "air" in ModesL3:
+            model.addConstrs(
+                (f3[d, r, "air"] == 0 for d in Dcs for r in Retailers),
+                name="Volcano_block_f3"
+            )
+
+    # TRADE WAR
+    if trade_war:
+        Sourcing_L1 = Sourcing_L1 * tariff_rate
+
+    # =====================================================
+    # OBJECTIVE
+    # =====================================================
+
+    M = 1e8
+    
+    model.setObjective(
+        Sourcing_L1 + Handling_L2 + Handling_L3 + LastMile_Cost +
+        CO2_Mfg + CO2Cost_L2_2 + Total_Transport + Total_InvCost_Model +
+        Cost_NewLocs + M * quicksum(v[r] for r in Retailers),
+        GRB.MINIMIZE
+    )
+
+    # =====================================================
+    # SOLVE
+    # =====================================================
+    
     model.optimize()
 
     # =====================================================
-    # EXTRACT RESULTS
+    # OUTPUT
     # =====================================================
 
-    results = {
-        "Status": model.status,
-        "Total_Cost_€": model.objVal if model.status == 2 else 0,
-        "CO2_Total": Total_CO2.getValue() if model.status == 2 else 0,
-        "Demand_Fulfillment_Rate": 100 * (1 - sum(v[r].X for r in Retailers) / sum(demand.values())) if model.status == 2 else 0,
-        
-        # Layer-specific CO2
-        "CO2_Layer1_Transport": CO2_tr_L1.getValue() if model.status == 2 else 0,
-        "CO2_Layer2_Transport": (CO2_tr_L2.getValue() + CO2_tr_L2_2.getValue()) if model.status == 2 else 0,
-        "CO2_Layer3_Transport": CO2_tr_L3.getValue() if model.status == 2 else 0,
-        "CO2_Production": (CO2_prod_L1.getValue() + CO2_prod_L2_2.getValue()) if model.status == 2 else 0,
-        "CO2_LastMile": LastMile_CO2.getValue() if model.status == 2 else 0,
-        
-        # Layer-specific costs
-        "Cost_Layer1": (Cost_Sourcing.getValue() + Cost_L1_Transport.getValue() + Cost_CD_Handling.getValue()) if model.status == 2 else 0,
-        "Cost_Layer2": (Cost_L2_Transport.getValue() + Cost_L2_2_Transport.getValue() + Cost_DC_Handling.getValue()) if model.status == 2 else 0,
-        "Cost_Layer3": (Cost_L3_Transport.getValue() + Cost_LastMile.getValue()) if model.status == 2 else 0,
-        "Cost_NewFacilities": Cost_NewLoc.getValue() if model.status == 2 else 0,
-        
-        # Selected configurations
-        "Selected_Plants": list(Plants),
-        "Selected_Crossdocks": list(Crossdocks),
-        "Selected_DCs": list(Dcs),
-        "Selected_Retailers": list(Retailers),
-        "Selected_NewLocs": list(New_Locs),
-        "Selected_Modes_L1": list(ModesL1),
-        "Selected_Modes_L2": list(ModesL2),
-        "Selected_Modes_L3": list(ModesL3),
-    }
+    f1_matrix = print_flows(f1, Plants, Crossdocks, ModesL1, "f1 (Plant → Crossdock)")
+    f2_matrix = print_flows(f2, Crossdocks, Dcs, ModesL2, "f2 (Crossdock → DC)")
+    if use_new_locations and len(New_Locs) > 0:
+        f2_2_matrix = print_flows(f2_2, New_Locs, Dcs, ModesL2, "f2_2 (NewLoc → DC)")
+    f3_matrix = print_flows(f3, Dcs, Retailers, ModesL3, "f3 (DC → Retailer)")
 
     if print_results == "YES":
-        print("=" * 60)
-        print("MULTI-LAYER OPTIMIZATION RESULTS")
-        print("=" * 60)
-        print(f"Status: {model.status}")
-        print(f"Total Cost: €{results['Total_Cost_€']:,.2f}")
-        print(f"Total CO2: {results['CO2_Total']:,.2f} kg")
-        print(f"Demand Fulfillment: {results['Demand_Fulfillment_Rate']:.1f}%")
-        print("\nLayer Configuration:")
-        print(f"  L1 Modes: {ModesL1} | {len(Plants)} Plants → {len(Crossdocks)} Crossdocks")
-        print(f"  L2 Modes: {ModesL2} | {len(Crossdocks)} Crossdocks → {len(Dcs)} DCs")
-        print(f"  L3 Modes: {ModesL3} | {len(Dcs)} DCs → {len(Retailers)} Retailers")
-        print("=" * 60)
+        print("Transport L1:", sum(Transport_L1[mo].getValue() for mo in ModesL1))
+        print("Transport L2:", sum(Transport_L2[mo].getValue() for mo in ModesL2))
+        if use_new_locations and len(New_Locs) > 0:
+            print("Transport L2 new:", sum(Transport_L2_2[mo].getValue() for mo in ModesL2))
+        print("Transport L3:", sum(Transport_L3[mo].getValue() for mo in ModesL3))
 
-    return results
+        print("Inventory L1:", Total_InvCost_L1.getValue())
+        print("Inventory L2:", Total_InvCost_L2.getValue())
+        if use_new_locations and len(New_Locs) > 0:
+            print("Inventory L2 new:", Total_InvCost_L2_2.getValue())
+        print("Inventory L3:", Total_InvCost_L3.getValue())
+        
+        print("Fixed Last Mile:", LastMile_Cost.getValue())
+        
+        print("CO2 Manufacturing at State 1:", CO2_Mfg.getValue())
+        if use_new_locations and len(New_Locs) > 0:
+            print("CO2 Cost L2_2:", CO2Cost_L2_2.getValue())
+        
+        print(f"Sourcing_L1: {Sourcing_L1.getValue():,.2f}")
+        print(f"Handling_L2_existing: {Handling_L2_existing.getValue():,.2f}")
+        print(f"Handling_L2 (total): {Handling_L2.getValue():,.2f}")
+        print(f"Handling_L3: {Handling_L3.getValue():,.2f}")
+        
+        if use_new_locations and len(New_Locs) > 0:
+            print("Fixed new locs:", FixedCost_NewLocs.getValue())
+            print("Prod new locs:", ProdCost_NewLocs.getValue())
+
+        print("CO2 total:", Total_CO2.getValue())
+        print("Total objective:", model.ObjVal)
+
+    E_air = (CO2_tr_L1_air + CO2_tr_L2_air + CO2_tr_L3_air).getValue()
+    E_sea = (CO2_tr_L1_sea + CO2_tr_L2_sea + CO2_tr_L3_sea).getValue()
+    E_road = (CO2_tr_L2_road + CO2_tr_L3_road).getValue()
+    E_lastmile = LastMile_CO2.getValue()
+    E_production = CO2_prod_L1.getValue()
+
+    U = sum(v[r].X for r in Retailers)
+    D_tot = sum(demand[r] for r in Retailers)
+    satisfied_units = D_tot - U
+    satisfied_pct = satisfied_units / D_tot if D_tot > 0 else 0
+
+    results = {
+        # --- Transport Costs ---
+        "Transport_L1": sum(Transport_L1[mo].getValue() for mo in ModesL1),
+        "Transport_L2": sum(Transport_L2[mo].getValue() for mo in ModesL2),
+        "Transport_L2_new": sum(Transport_L2_2[mo].getValue() for mo in ModesL2) if use_new_locations and len(New_Locs) > 0 else 0,
+        "Transport_L3": sum(Transport_L3[mo].getValue() for mo in ModesL3),
+
+        # --- Inventory Costs ---
+        "Inventory_L1": Total_InvCost_L1.getValue(),
+        "Inventory_L2": Total_InvCost_L2.getValue(),
+        "Inventory_L2_new": Total_InvCost_L2_2 if use_new_locations and len(New_Locs) > 0 else 0,
+        "Inventory_L3": Total_InvCost_L3.getValue(),
+
+        # --- Last Mile & CO2 ---
+        "Fixed_Last_Mile": LastMile_Cost.getValue(),
+        "CO2_Cost_L2_2": CO2Cost_L2_2.getValue() if use_new_locations and len(New_Locs) > 0 else 0,
+        "CO2_Manufacturing_State1": CO2_Mfg.getValue(),
+        "CO2_Total": Total_CO2.getValue(),
+
+        # --- Sourcing & Handling ---
+        "Sourcing_L1": Sourcing_L1.getValue(),
+        "Handling_L2_existing": Handling_L2_existing.getValue(),
+        "Handling_L2_total": Handling_L2.getValue(),
+        "Handling_L3": Handling_L3.getValue(),
+
+        # --- New Locations & Production ---
+        "FixedCost_NewLocs": FixedCost_NewLocs.getValue() if use_new_locations and len(New_Locs) > 0 else 0,
+        "ProdCost_NewLocs": ProdCost_NewLocs.getValue() if use_new_locations and len(New_Locs) > 0 else 0,
+        
+        # --- Emission Calculations ---
+        "E_air": E_air,
+        "E_sea": E_sea,
+        "E_road": E_road,
+        "E_lastmile": E_lastmile,
+        "E_production": E_production,
+
+        # --- Objective ---
+        "Objective_value": model.ObjVal - M * U if model.status == 2 else 0,
+        "Satisfied_Demand_pct": satisfied_pct,
+        "Satisfied_Demand_units": satisfied_units
+    }
+
+    return results, model
+
 
 if __name__ == "__main__":
-    result = run_scenario_master()
-    print(result)
+    # Test with new locations (like SC2F_uns)
+    result, model = run_scenario_master(use_new_locations=True, print_results="YES")
+    print("\n✓ SC2F_uns equivalent test completed")
+    
+    # Test without new locations (like SC1F_uns)
+    result, model = run_scenario_master(use_new_locations=False, print_results="YES")
+    print("\n✓ SC1F_uns equivalent test completed")

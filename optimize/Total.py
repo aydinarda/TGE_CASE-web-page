@@ -388,8 +388,8 @@ elif st.session_state.nav_mode == "📊 Optimization":
 
         with col1:
             st.write("### Interactive Map")
-            l2_locs = st.session_state.selected_crossdocks + st.session_state.selected_dcs
-            fig_l2 = create_interactive_map(l2_locs, "Layer 2: Crossdocks & DCs")
+            l2_locs = st.session_state.selected_crossdocks + st.session_state.selected_dcs + st.session_state.selected_new_locs
+            fig_l2 = create_interactive_map(l2_locs, "Layer 2: Crossdocks, DCs & New Locations")
             if fig_l2:
                 st.plotly_chart(fig_l2, use_container_width=True)
 
@@ -415,6 +415,16 @@ elif st.session_state.nav_mode == "📊 Optimization":
                 help="Air, Sea, or Road for regional distribution",
             )
             st.session_state.selected_modes_l2 = new_modes_l2
+
+            st.markdown("**New Locations (Optional):**")
+            new_new_locs = st.multiselect(
+                "Consider New Locations",
+                ALL_NEW_LOCS,
+                default=st.session_state.selected_new_locs,
+                key="opt_l2_new_locs",
+                help="Optional new distribution hubs",
+            )
+            st.session_state.selected_new_locs = new_new_locs
 
         display_layer_summary(
             2,
@@ -460,16 +470,6 @@ elif st.session_state.nav_mode == "📊 Optimization":
             )
             st.session_state.selected_modes_l3 = new_modes_l3
 
-            st.markdown("**New Facilities:**")
-            new_new_locs = st.multiselect(
-                "Consider New Locations",
-                ALL_NEW_LOCS,
-                default=st.session_state.selected_new_locs,
-                key="opt_new_locs",
-                help="Optional expansion opportunities",
-            )
-            st.session_state.selected_new_locs = new_new_locs
-
         display_layer_summary(
             3,
             st.session_state.selected_dcs,
@@ -501,10 +501,11 @@ elif st.session_state.nav_mode == "📊 Optimization":
             )
 
         with col2:
-            model_choice = st.selectbox(
-                "Model Type",
-                ["SC1F - Existing Facilities", "SC2F - Allow New Facilities"],
-                key="opt_model",
+            use_new_locs = st.checkbox(
+                "Include New Locations",
+                value=len(st.session_state.selected_new_locs) > 0,
+                key="opt_use_new_locs",
+                help="Allow optimization to use new distribution hubs",
             )
             tariff_rate = st.slider(
                 "Tariff Rate", 1.0, 2.0, 1.0, step=0.05, key="opt_tariff"
@@ -518,8 +519,8 @@ elif st.session_state.nav_mode == "📊 Optimization":
             if st.button("🚀 RUN OPTIMIZATION", use_container_width=True, key="opt_run"):
                 with st.spinner("⏳ Optimizing multi-layer network..."):
                     try:
-                        results = run_scenario_master(
-                            use_new_locations=("SC2F" in model_choice),
+                        results, model = run_scenario_master(
+                            use_new_locations=use_new_locs and len(st.session_state.selected_new_locs) > 0,
                             allow_unmet_demand=True,
                             selected_plants=(
                                 st.session_state.selected_plants or ALL_PLANTS
@@ -533,23 +534,23 @@ elif st.session_state.nav_mode == "📊 Optimization":
                             selected_retailers=(
                                 st.session_state.selected_retailers or ALL_RETAILERS
                             ),
-                            selected_new_locs=st.session_state.selected_new_locs,
-                            selected_modes=(
-                                st.session_state.selected_modes_l2
-                                + st.session_state.selected_modes_l3
-                            ),
+                            selected_new_locs=(st.session_state.selected_new_locs if use_new_locs else []),
                             selected_modes_l1=st.session_state.selected_modes_l1,
                             selected_modes_l2=st.session_state.selected_modes_l2,
                             selected_modes_l3=st.session_state.selected_modes_l3,
                             CO_2_percentage=co2_pct / 100.0,
                             service_level=service_level,
                             tariff_rate=tariff_rate,
+                            print_results="NO",
                         )
                         st.session_state.optimization_results = results
+                        st.session_state.optimization_model = model
                         st.success("✅ Optimization complete!")
                         st.balloons()
                     except Exception as e:
                         st.error(f"❌ Optimization failed: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
 
     # ---------- RESULTS TAB ----------
     with tab_results:
@@ -558,31 +559,31 @@ elif st.session_state.nav_mode == "📊 Optimization":
 
             st.subheader("📊 Results Summary")
 
-            # KPI Row
+            # KPI Row - aligned with MASTER.py structure
             kpi_cols = st.columns(4)
             with kpi_cols[0]:
-                total_cost = results.get("Total_Cost_€", 0)
+                total_cost = results.get("Objective_value", 0) if isinstance(results, dict) else 0
                 st.metric("💰 Total Cost", f"€{total_cost:,.0f}")
             with kpi_cols[1]:
-                co2_total = results.get("CO2_Total", 0)
+                co2_total = results.get("CO2_Total", 0) if isinstance(results, dict) else 0
                 st.metric("🌱 Total CO₂", f"{co2_total:,.0f} kg")
             with kpi_cols[2]:
-                demand_met = results.get("Demand_Fulfillment_Rate", 0)
+                demand_met = results.get("Satisfied_Demand_pct", 0) * 100 if isinstance(results, dict) else 0
                 st.metric("📦 Demand Met", f"{demand_met:.1f}%")
             with kpi_cols[3]:
-                new_facs = len(
-                    [k for k in results.keys() if "New_Facility" in k and results[k]]
-                )
-                st.metric("🌟 New Facilities", f"{new_facs}")
+                new_facs_fixed = results.get("FixedCost_NewLocs", 0) if isinstance(results, dict) else 0
+                has_new = "✓" if new_facs_fixed > 0 else "✗"
+                st.metric("🌟 New Facilities", has_new)
 
             st.markdown("---")
 
-            # Complete Network Map
+            # Complete Network Map - includes new locations when selected
             all_locs = (
                 st.session_state.selected_plants
                 + st.session_state.selected_crossdocks
                 + st.session_state.selected_dcs
                 + st.session_state.selected_retailers
+                + st.session_state.selected_new_locs
             )
 
             st.write("### Complete Supply Chain Network")
@@ -594,9 +595,41 @@ elif st.session_state.nav_mode == "📊 Optimization":
 
             st.markdown("---")
 
-            # Detailed results
-            st.write("### Detailed Configuration")
-            c1, c2, c3 = st.columns(3)
+            # Detailed results breakdown
+            st.write("### Cost Breakdown by Layer")
+            
+            cost_cols = st.columns(3)
+            with cost_cols[0]:
+                cost_l1 = results.get("Cost_Layer1", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 1 Cost", f"€{cost_l1:,.0f}", help="Plants→Crossdocks")
+            with cost_cols[1]:
+                cost_l2 = results.get("Cost_Layer2", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 2 Cost", f"€{cost_l2:,.0f}", help="Crossdocks→DCs (+ New Locs)")
+            with cost_cols[2]:
+                cost_l3 = results.get("Cost_Layer3", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 3 Cost", f"€{cost_l3:,.0f}", help="DCs→Retailers")
+
+            st.markdown("---")
+
+            # CO2 breakdown
+            st.write("### CO₂ Emissions Breakdown")
+            
+            co2_cols = st.columns(3)
+            with co2_cols[0]:
+                co2_l1 = results.get("CO2_Layer1_Transport", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 1 CO₂", f"{co2_l1:,.0f} kg", help="Transport")
+            with co2_cols[1]:
+                co2_l2 = results.get("CO2_Layer2_Transport", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 2 CO₂", f"{co2_l2:,.0f} kg", help="Transport")
+            with co2_cols[2]:
+                co2_l3 = results.get("CO2_Layer3_Transport", 0) if isinstance(results, dict) else 0
+                st.metric("Layer 3 CO₂", f"{co2_l3:,.0f} kg", help="Transport")
+
+            st.markdown("---")
+
+            # Configuration summary
+            st.write("### Selected Configuration")
+            c1, c2, c3, c4 = st.columns(4)
 
             with c1:
                 st.write("**Layer 1 - International**")
@@ -623,6 +656,16 @@ elif st.session_state.nav_mode == "📊 Optimization":
                 st.write(
                     f"To Retailers: {len(st.session_state.selected_retailers)}"
                 )
+
+            with c4:
+                if st.session_state.selected_new_locs:
+                    st.write("**New Locations**")
+                    st.write(f"Count: {len(st.session_state.selected_new_locs)}")
+                    for loc in st.session_state.selected_new_locs:
+                        st.write(f"• {loc}")
+                else:
+                    st.write("**New Locations**")
+                    st.write("None selected")
         else:
             st.info("👈 Run optimization from the Parameters tab to see results!")
 
@@ -781,6 +824,15 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
 
         st.markdown("---")
 
+        guess_use_new_locs = st.checkbox(
+            "Consider New Locations in Your Guess",
+            value=False,
+            key="guess_use_new_locs",
+            help="Should the optimal solution include new distribution hubs?",
+        )
+
+        st.markdown("---")
+
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
             if st.button(
@@ -791,7 +843,9 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
                 with st.spinner("Evaluating your guesses..."):
                     try:
                         # Your guess results
-                        guess_results = run_scenario_master(
+                        guess_results, _ = run_scenario_master(
+                            use_new_locations=guess_use_new_locs,
+                            allow_unmet_demand=True,
                             selected_plants=(
                                 st.session_state.guess_plants or ALL_PLANTS
                             ),
@@ -804,6 +858,11 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
                             selected_retailers=(
                                 st.session_state.guess_retailers or ALL_RETAILERS
                             ),
+                            selected_new_locs=(
+                                st.session_state.selected_new_locs
+                                if guess_use_new_locs
+                                else []
+                            ),
                             selected_modes_l1=(
                                 st.session_state.guess_modes_l1 or ALL_MODES_L1
                             ),
@@ -815,19 +874,26 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
                             ),
                             CO_2_percentage=guess_co2_pct / 100.0,
                             service_level=guess_svc_level,
+                            tariff_rate=1.0,
+                            print_results="NO",
                         )
 
-                        # Optimal results (all options)
-                        optimal_results = run_scenario_master(
+                        # Optimal results (all options with new locations)
+                        optimal_results, _ = run_scenario_master(
+                            use_new_locations=True,
+                            allow_unmet_demand=True,
                             selected_plants=ALL_PLANTS,
                             selected_crossdocks=ALL_CROSSDOCKS,
                             selected_dcs=ALL_DCS,
                             selected_retailers=ALL_RETAILERS,
+                            selected_new_locs=ALL_NEW_LOCS,
                             selected_modes_l1=ALL_MODES_L1,
                             selected_modes_l2=ALL_MODES_L2,
                             selected_modes_l3=ALL_MODES_L3,
                             CO_2_percentage=0.5,
                             service_level=0.9,
+                            tariff_rate=1.0,
+                            print_results="NO",
                         )
 
                         st.session_state.guess_results = guess_results
@@ -836,6 +902,8 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
                         st.balloons()
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
 
     # ---------- GUESSING RESULTS ----------
     with tab_g_results:
@@ -848,7 +916,7 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
 
             st.subheader("🏆 Comparison Results")
 
-            # KPI Comparison
+            # KPI Comparison - using correct keys from MASTER.py
             kpi_data = pd.DataFrame(
                 {
                     "Metric": [
@@ -857,14 +925,14 @@ elif st.session_state.nav_mode == "🎮 Guessing Game":
                         "Demand Fulfillment %",
                     ],
                     "Your Guess": [
-                        guess_res.get("Total_Cost_€", 0),
-                        guess_res.get("CO2_Total", 0),
-                        guess_res.get("Demand_Fulfillment_Rate", 100),
+                        guess_res.get("Objective_value", 0) if isinstance(guess_res, dict) else 0,
+                        guess_res.get("CO2_Total", 0) if isinstance(guess_res, dict) else 0,
+                        (guess_res.get("Satisfied_Demand_pct", 1) * 100) if isinstance(guess_res, dict) else 100,
                     ],
                     "Optimal": [
-                        optimal_res.get("Total_Cost_€", 0),
-                        optimal_res.get("CO2_Total", 0),
-                        optimal_res.get("Demand_Fulfillment_Rate", 100),
+                        optimal_res.get("Objective_value", 0) if isinstance(optimal_res, dict) else 0,
+                        optimal_res.get("CO2_Total", 0) if isinstance(optimal_res, dict) else 0,
+                        (optimal_res.get("Satisfied_Demand_pct", 1) * 100) if isinstance(optimal_res, dict) else 100,
                     ],
                 }
             )
