@@ -60,6 +60,8 @@ def run_scenario_master(
     CO_2_percentage=0.5,           # reduction vs CO2_base
     unit_penaltycost=1.7,          # kept for compatibility (unused here)
     unit_inventory_holdingCost=0.85,
+    service_level = 0.9,
+
 
     # --- Scenario toggles ---
     suez_canal=False,              # blocks sea on L1
