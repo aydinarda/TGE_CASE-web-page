@@ -596,12 +596,12 @@ def run_scenario_master(
             name="NewLocCapacity",
         )
 
-    # CO2 cap (either absolute or percentage reduction)
-    if CO_2_max is not None:
-        model.addConstr(Total_CO2 <= CO_2_max, name="CO2_cap_absolute")
-    elif CO2_base is not None and CO_2_percentage is not None:
-        co2_limit = CO2_base * (1.0 - CO_2_percentage)
-        model.addConstr(Total_CO2 <= co2_limit, name="CO2_cap_relative")
+    # C02 Enforcement
+
+    model.addConstr(
+        Total_CO2 <= CO2_base * (1 - CO_2_percentage),
+        name="CO2ReductionTarget"
+    )
 
     # Scenario-specific structural constraints
 
