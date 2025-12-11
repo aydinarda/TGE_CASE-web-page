@@ -432,36 +432,57 @@ def run_scenario_master(
 
     Cost_NewLocs = Cost_NewLoc_var + Cost_NewLoc_fixed
 
-    # ---- Inventory cost (safety stock proxy) ----
+    # ---- Inventory cost (transit + safety stock proxy, SC1F-style) ----
+    total_demand = sum(demand.values())
+
+    # L1: Plant -> Crossdock
     InvCost_L1 = 0
     if f1:
         InvCost_L1 = quicksum(
-            df.loc[mo, "SS (€/unit)"] * f1[p, c, mo]
+            f1[p, c, mo] * (
+                df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                + df.loc[mo, "SS (€/unit)"] / total_demand
+            )
             for p in Plants for c in Crossdocks for mo in ModesL1
         )
 
+    # L2 (existing): Crossdock -> DC
     InvCost_L2 = 0
     if f2:
         InvCost_L2 = quicksum(
-            df.loc[mo, "SS (€/unit)"] * f2[c, d, mo]
+            f2[c, d, mo] * (
+                df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                + df.loc[mo, "SS (€/unit)"] / total_demand
+            )
             for c in Crossdocks for d in Dcs for mo in ModesL2
         )
 
+    # L2 (new plants): New_Loc -> DC
     InvCost_L2_new = 0
     if f2_new:
         InvCost_L2_new = quicksum(
-            df.loc[mo, "SS (€/unit)"] * f2_new[n, d, mo]
+            f2_new[n, d, mo] * (
+                df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                + df.loc[mo, "SS (€/unit)"] / total_demand
+            )
             for n in New_Locs for d in Dcs for mo in ModesL2
         )
 
+    # L3: DC -> Retailer
     InvCost_L3 = 0
     if f3:
         InvCost_L3 = quicksum(
-            df.loc[mo, "SS (€/unit)"] * f3[d, r, mo]
+            f3[d, r, mo] * (
+                df.loc[mo, "LT (days)"] * df.loc[mo, "h (€/unit)"]
+                + df.loc[mo, "SS (€/unit)"] / total_demand
+            )
             for d in Dcs for r in Retailers for mo in ModesL3
         )
 
     Total_InvCost_Model = InvCost_L1 + InvCost_L2 + InvCost_L2_new + InvCost_L3
+
+
+
 
     # ---- CO2 emissions ----
     # Production at existing plants
