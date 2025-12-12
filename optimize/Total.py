@@ -318,12 +318,18 @@ elif mode == "Gamification Mode":
 
     # --- Facility activation ---
     st.markdown("#### Facility activation")
+    
+
+
 
     plants_all = ["TW", "SHA"]
     crossdocks_all = ["ATVIE", "PLGDN", "FRCDG"]
     dcs_all = ["PED", "FR6216", "RIX", "GMZ"]
     new_locs_all = ["HUDTG", "CZMCT", "IEILG", "FIMPF", "PLZCA"]
+    
 
+
+    
     col_p, col_c, col_d, col_n = st.columns(4)
     with col_p:
         st.caption("Plants")
@@ -349,6 +355,11 @@ elif mode == "Gamification Mode":
             n for n in new_locs_all
             if st.checkbox(n, value=True, key=f"gm_new_{n}")
         ]
+
+    st.session_state["gm_active_new_locs"]   = gm_active_new_locs
+    
+    # Map selections -> MASTER boolean flags (isHUDTG, isCZMCT, ...)
+    gm_newloc_flag_kwargs = {f"is{code}": (code in gm_active_new_locs) for code in new_locs_all}
 
     # --- Mode activation ---
     st.markdown("#### Allowed transport modes per layer")

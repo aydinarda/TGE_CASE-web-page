@@ -95,7 +95,13 @@ def run_scenario_master(
     unit_penaltycost=1.7,          # kept for compatibility (unused here)
     unit_inventory_holdingCost=0.85,
     service_level = 0.9,
-
+    
+    # NEW: per-new-location switches (None => backward compatible)
+    isHUDTG=None,
+    isCZMCT=None,
+    isIEILG=None,
+    isFIMPF=None,
+    isPLZCA=None,
 
     # --- Scenario toggles ---
     suez_canal=False,              # blocks sea on L1
@@ -276,10 +282,28 @@ def run_scenario_master(
     # ======================================================
     # 2. ACTIVE SETS & MODES
     # ======================================================
+    
+    # Base selection (existing behavior)
+    New_Locs_base = New_Locs_all if active_new_locs is None else list(active_new_locs)
 
     # Locations: if user passes a list, we use that; otherwise full set
     Plants = Plants_all if active_plants is None else list(active_plants)
-    New_Locs = New_Locs_all if active_new_locs is None else list(active_new_locs)
+    # NEW: flags -> location mapping
+    newloc_flags = {
+        "HUDTG": isHUDTG,
+        "CZMCT": isCZMCT,
+        "IEILG": isIEILG,
+        "FIMPF": isFIMPF,
+        "PLZCA": isPLZCA,
+    }
+    
+    # If any flag is explicitly provided (True/False), use flags as the gate.
+    if any(v is not None for v in newloc_flags.values()):
+        selected = {k for k, v in newloc_flags.items() if bool(v)}
+        New_Locs = [n for n in New_Locs_base if n in selected]
+    else:
+        # Backward compatible: no flags provided => keep old behavior
+        New_Locs = list(New_Locs_base)
     Crossdocks = Crossdocks_all if active_crossdocks is None else list(active_crossdocks)
     Dcs = Dcs_all if active_dcs is None else list(active_dcs)
 
@@ -358,6 +382,9 @@ def run_scenario_master(
             name="f2_2",   # NewLoc → DC
         )
         f2_2_bin = model.addVars(New_Locs, vtype=GRB.BINARY, name="f2_2_bin")
+        
+        
+        
 
     f3 = {}
     if len(Dcs) > 0 and len(Retailers) > 0 and len(ModesL3) > 0:
@@ -657,6 +684,9 @@ def run_scenario_master(
         Total_CO2 <= CO2_base * (1 - CO_2_percentage),
         name="CO2ReductionTarget"
     )
+
+    model.addConstr(quicksum(f2_2_bin[n] for n in New_Locs) == len(New_Locs))
+
 
     # Scenario-specific structural constraints
 
