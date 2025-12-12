@@ -429,6 +429,7 @@ if st.button("Run Optimization"):
                     volcano=volcano_flag,
                     trade_war=trade_flag,
                     tariff_rate=tariff_rate_used,
+                    service_level=service_level,
                     print_results="NO",
                 )
 
@@ -439,6 +440,41 @@ if st.button("Run Optimization"):
                     master_kwargs["co2_cost_per_ton_New"] = co2_cost_per_ton_New
 
                 results, model = run_scenario_master(**master_kwargs)
+                
+                # ------------------------------------------------------------
+                # Benchmarking
+                # ------------------------------------------------------------
+                try:
+                    # Always benchmark against SC2F optimal (Allow New Facilities)
+                    benchmark_label = "SC2F Optimal (Allow New Facilities)"
+                
+                    # Use the same CO₂ price the user entered
+                    # - SC1F seçiliyse: co2_cost_per_ton var
+                    # - SC2F seçiliyse: co2_cost_per_ton_New var
+                    bench_co2_existing = co2_cost_per_ton if "SC1F" in model_choice else co2_cost_per_ton_New
+                    bench_co2_new      = co2_cost_per_ton_New if "SC2F" in model_choice else co2_cost_per_ton
+                
+                    benchmark_results, benchmark_model = run_SC2F(
+                        CO_2_percentage=co2_pct,
+                        co2_cost_per_ton=bench_co2_existing,
+                        co2_cost_per_ton_New=bench_co2_new,
+                        suez_canal=suez_flag,
+                        oil_crises=oil_flag,
+                        volcano=volcano_flag,
+                        trade_war=trade_flag,
+                        tariff_rate=tariff_rate_used,
+                        print_results="NO",
+                        service_level=service_level,
+                    )
+                
+                except Exception as _bench_e:
+                    benchmark_results = None
+                    benchmark_model = None
+                    benchmark_label = None
+                    st.warning(f"Benchmark run failed (showing only gamification results). Reason: {_bench_e}")
+                
+                
+                
 
             elif "SC1F" in model_choice:
                 # Existing facilities only
@@ -474,6 +510,37 @@ if st.button("Run Optimization"):
             # Objective + Emissions
             # ===========================================
             st.metric("💰 Objective Value (€)", f"{results['Objective_value']:,.2f}")
+
+            # ------------------------------------------------------------
+            # Show gap vs optimal (only in Gamification Mode)
+            # ------------------------------------------------------------
+            if mode == "Gamification Mode" and benchmark_results is not None:
+                try:
+                    stud_obj = float(results.get("Objective_value", 0.0))
+                    opt_obj  = float(benchmark_results.get("Objective_value", 0.0))
+                    gap = stud_obj - opt_obj
+                    gap_pct = (gap / opt_obj * 100.0) if opt_obj != 0 else 0.0
+            
+                    st.subheader("🏁 Gap vs Optimal")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Your (Gamification) Objective (€)", f"{stud_obj:,.2f}")
+                    c2.metric(benchmark_label or "Optimal Objective (€)", f"{opt_obj:,.2f}")
+                    c3.metric("Gap (You − Optimal)", f"{gap:,.2f}", delta=f"{gap_pct:+.2f}%")
+            
+                    with st.expander("See benchmark breakdown"):
+                        st.json({
+                            "Benchmark": benchmark_label,
+                            "Benchmark Objective": opt_obj,
+                            "Your Objective": stud_obj,
+                            "Absolute Gap": gap,
+                            "Gap (%)": gap_pct,
+                        })
+                except Exception:
+                    pass
+
+
+
+
 
             st.subheader("🌿 CO₂ Emissions")
             st.json({
