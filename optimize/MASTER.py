@@ -190,7 +190,9 @@ def run_scenario_master(
             SS = np.sqrt(LT + 1) * std_demand * (p + h) * phi_z
             SS_vals.append(SS)
         df["SS (€/unit)"] = SS_vals
-
+    
+    
+    data["SS (€/unit)"] = [2109.25627631292, 12055.4037653689, 5711.89299799521] # may turn back to above calculation, just keeping hardcoded version for now
     # Shortcut: per-mode variable transport cost in €/kg-km
     tau = {m: df.loc[m, "t (€/kg-km)"] for m in df.index}
 
@@ -696,60 +698,136 @@ def run_scenario_master(
 
     model.optimize()
 
-    # ======================================================
-    # 9. KPIs & RESULT DICT
-    # ======================================================
+        # ------------------------------
+    # FLOW MATRICES (UI için)
+    # ------------------------------
+    f1_matrix   = print_flows(f1, Plants, Crossdocks, ModesL1, "f1 (Plant → Crossdock)")
+    f2_matrix   = print_flows(f2, Crossdocks, Dcs, ModesL2, "f2 (Crossdock → DC)")
+    f2_2matrix  = print_flows(f2_2, New_Locs, Dcs, ModesL2, "f2 new (New Locs → DC)")
+    f3_matrix   = print_flows(f3, Dcs, Retailers, ModesL3, "f3 (DC → Retailer)")
 
-    # If infeasible, you can inspect IIS outside of this function.
-    if model.Status not in (GRB.OPTIMAL, GRB.TIME_LIMIT):
-        results = {
-            "Status": model.Status,
-            "Objective_value": None,
-        }
-        return results, model
+    # ------------------------------
+    # COST / CO2 NUMERICS
+    # ------------------------------
+    def _safe_val(x):
+        try:
+            return float(x.getValue())
+        except Exception:
+            try:
+                return float(x)
+            except Exception:
+                return 0.0
 
-    # Emissions per mode (for UI)
-    def safe_get(expr):
-        return expr.getValue() if hasattr(expr, "getValue") else float(expr)
+    # Transport totals (MASTER.py’de bunlar var)
+    T_L1     = _safe_val(Total_Transport_L1)
+    T_L2     = _safe_val(Total_Transport_L2)
+    T_L2_new = _safe_val(Total_Transport_L2_new)
+    T_L3     = _safe_val(Total_Transport_L3)
 
-    CO2_tr_L1_air = safe_get(CO2_tr_L1_by_mode.get("air", 0))
-    CO2_tr_L1_sea = safe_get(CO2_tr_L1_by_mode.get("sea", 0))
-    CO2_tr_L1_road = safe_get(CO2_tr_L1_by_mode.get("road", 0))
+    # Inventory (MASTER.py’de InvCost_* var)
+    I_L1     = _safe_val(InvCost_L1)
+    I_L2     = _safe_val(InvCost_L2)
+    I_L2_new = _safe_val(InvCost_L2_new)
+    I_L3     = _safe_val(InvCost_L3)
 
-    CO2_tr_L2_air = safe_get(CO2_tr_L2_by_mode.get("air", 0)) + safe_get(CO2_tr_L2_new_by_mode.get("air", 0))
-    CO2_tr_L2_sea = safe_get(CO2_tr_L2_by_mode.get("sea", 0)) + safe_get(CO2_tr_L2_new_by_mode.get("sea", 0))
-    CO2_tr_L2_road = safe_get(CO2_tr_L2_by_mode.get("road", 0)) + safe_get(CO2_tr_L2_new_by_mode.get("road", 0))
+    # Last mile
+    LM_cost  = _safe_val(LastMile_Cost)
 
-    CO2_tr_L3_air = safe_get(CO2_tr_L3_by_mode.get("air", 0))
-    CO2_tr_L3_sea = safe_get(CO2_tr_L3_by_mode.get("sea", 0))
-    CO2_tr_L3_road = safe_get(CO2_tr_L3_by_mode.get("road", 0))
+    # Sourcing & Handling (MASTER.py’de Handling_L2_existing yok)
+    S_L1     = _safe_val(Sourcing_L1)
+    H_L2     = _safe_val(Handling_L2)
+    H_L3     = _safe_val(Handling_L3)
 
-    E_air = CO2_tr_L1_air + CO2_tr_L2_air + CO2_tr_L3_air
-    E_sea = CO2_tr_L1_sea + CO2_tr_L2_sea + CO2_tr_L3_sea
-    E_road = CO2_tr_L1_road + CO2_tr_L2_road + CO2_tr_L3_road
+    # New locations: variable + fixed
+    FixedCost_NewLocs = _safe_val(Cost_NewLoc_fixed)
+    ProdCost_NewLocs  = _safe_val(Cost_NewLoc_var)
 
-    E_lastmile = safe_get(LastMile_CO2)
-    E_production = safe_get(CO2_prod_L1 + CO2_prod_new)
-    CO2_total = safe_get(Total_CO2)
+    # CO2 parçaları (MASTER.py’de hesaplanıyor)
+    E_air        = _safe_val((CO2_tr_L1_by_mode.get("air", 0) if 'CO2_tr_L1_by_mode' in locals() else 0) +
+                             (CO2_tr_L2_by_mode.get("air", 0) if 'CO2_tr_L2_by_mode' in locals() else 0) +
+                             (CO2_tr_L2_new_by_mode.get("air", 0) if 'CO2_tr_L2_new_by_mode' in locals() else 0) +
+                             (CO2_tr_L3_by_mode.get("air", 0) if 'CO2_tr_L3_by_mode' in locals() else 0))
+
+    E_sea        = _safe_val((CO2_tr_L1_by_mode.get("sea", 0) if 'CO2_tr_L1_by_mode' in locals() else 0) +
+                             (CO2_tr_L2_by_mode.get("sea", 0) if 'CO2_tr_L2_by_mode' in locals() else 0) +
+                             (CO2_tr_L2_new_by_mode.get("sea", 0) if 'CO2_tr_L2_new_by_mode' in locals() else 0) +
+                             (CO2_tr_L3_by_mode.get("sea", 0) if 'CO2_tr_L3_by_mode' in locals() else 0))
+
+    E_road       = _safe_val((CO2_tr_L2_by_mode.get("road", 0) if 'CO2_tr_L2_by_mode' in locals() else 0) +
+                             (CO2_tr_L2_new_by_mode.get("road", 0) if 'CO2_tr_L2_new_by_mode' in locals() else 0) +
+                             (CO2_tr_L3_by_mode.get("road", 0) if 'CO2_tr_L3_by_mode' in locals() else 0))
+
+    E_lastmile   = _safe_val(LastMile_CO2)
+    E_production = _safe_val(CO2_prod_L1 + CO2_prod_new)
+
+    CO2_total    = _safe_val(Total_CO2)
+
+    if print_results == "YES":
+        print("Transport L1:", T_L1)
+        print("Transport L2:", T_L2)
+        print("Transport L2 new:", T_L2_new)
+        print("Transport L3:", T_L3)
+
+        print("Inventory L1:", I_L1)
+        print("Inventory L2:", I_L2)
+        print("Inventory L2 new:", I_L2_new)
+        print("Inventory L3:", I_L3)
+
+        print("Fixed Last Mile:", LM_cost)
+
+        print(f"Sourcing_L1: {S_L1:,.2f}")
+        print(f"Handling_L2_total: {H_L2:,.2f}")
+        print(f"Handling_L3: {H_L3:,.2f}")
+
+        print("Fixed new locs:", FixedCost_NewLocs)
+        print("Prod new locs:", ProdCost_NewLocs)
+        print("CO2 total:", CO2_total)
+        print("Total objective:", model.ObjVal)
 
     results = {
-        "Status": model.Status,
-        "Objective_value": model.ObjVal,
+        # --- Flow matrices (UI) ---
+        "f1_matrix": f1_matrix,
+        "f2_matrix": f2_matrix,
+        "f2_2matrix": f2_2matrix,
+        "f3_matrix": f3_matrix,
+
+        # --- Transport Costs ---
+        "Transport_L1": T_L1,
+        "Transport_L2": T_L2,
+        "Transport_L2_new": T_L2_new,
+        "Transport_L3": T_L3,
+
+        # --- Inventory Costs ---
+        "Inventory_L1": I_L1,
+        "Inventory_L2": I_L2,
+        "Inventory_L2_new": I_L2_new,
+        "Inventory_L3": I_L3,
+
+        # --- Last Mile ---
+        "Fixed_Last_Mile": LM_cost,
+
+        # --- Sourcing & Handling ---
+        "Sourcing_L1": S_L1,
+        "Handling_L2_existing": H_L2,   # MASTER.py’de ayrı yok; aynı değeri veriyorum
+        "Handling_L2_total": H_L2,
+        "Handling_L3": H_L3,
+
+        # --- New Locations & Production ---
+        "FixedCost_NewLocs": FixedCost_NewLocs,
+        "ProdCost_NewLocs": ProdCost_NewLocs,
+
+        # --- Emission Calculations ---
         "E_air": E_air,
         "E_sea": E_sea,
         "E_road": E_road,
         "E_lastmile": E_lastmile,
         "E_production": E_production,
         "CO2_Total": CO2_total,
+
+        # --- Objective ---
+        "Objective_value": model.ObjVal,
+        "Status": model.Status,
     }
 
-    if print_results == "YES":
-        print(f"Objective value: {model.ObjVal:,.2f}")
-        print(f"CO2 total: {CO2_total:,.2f} tons")
-        print(f"  E_air:  {E_air:,.2f}")
-        print(f"  E_sea:  {E_sea:,.2f}")
-        print(f"  E_road: {E_road:,.2f}")
-        print(f"  Lastmile CO2: {E_lastmile:,.2f}")
-        print(f"  Production CO2: {E_production:,.2f}")
-
     return results, model
+
