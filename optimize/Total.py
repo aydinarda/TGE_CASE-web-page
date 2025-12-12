@@ -23,6 +23,8 @@ from sc2_app import run_sc2
 from Scenario_Setting_For_SC1F import run_scenario as run_SC1F
 from Scenario_Setting_For_SC2F import run_scenario as run_SC2F
 from MASTER import run_scenario_master  # NEW: fully parametric master model
+from collections import defaultdict
+
 
 
 # ================================================================
@@ -134,6 +136,79 @@ def positive_input(label, default):
     except:
         st.warning(f"{label} must be numeric. Using {default}.")
         return default
+    
+# ------------------------------------------------------------
+# Helpers (NEW): compute node activity from flows
+# ------------------------------------------------------------
+EPS = 1e-6
+
+# IMPORTANT: Map displayed City labels -> model facility keys used in variable names
+# Adjust these to match YOUR model naming.
+CITY_TO_KEYS = {
+    # Plants (model keys)
+    "Shanghai": ["SHA"],
+    "Hong Kong": ["TW"],  # if TW plant is represented by Hong Kong on the map
+
+    # Cross-docks (example mapping; adjust!)
+    "Paris": ["FRCDG"],
+    "Frankfurt": ["PLGDN"],
+    "Athens": ["ATVIE"],
+
+    # DCs (adjust to your actual DC keys!)
+    "Budapest": ["PED"],
+    "Munich": ["FR6216"],
+    "Bern": ["RIX"],
+    "Milan": ["GMZ"],
+
+    # Retailers (adjust if your model uses different retailer keys)
+    "Copenhagen": ["Copenhagen"],
+    "Dublin": ["Dublin"],
+    "London": ["London"],
+    "Krakow": ["Krakow"],
+    "Lyon": ["Lyon"],
+    "Marseille": ["Marseille"],
+    "Madrid": ["Madrid"],
+}
+
+def _parse_inside_brackets(varname: str):
+    # "f2[ATVIE,GMZ,air]" -> ["ATVIE","GMZ","air"]
+    i = varname.find("[")
+    j = varname.rfind("]")
+    if i == -1 or j == -1 or j <= i:
+        return None
+    inside = varname[i+1:j]
+    return [x.strip() for x in inside.split(",")]
+
+def compute_key_throughput(model) -> dict:
+    """
+    Returns dict: facility_key -> total flow touching the node (in+out aggregated)
+    Based on f1, f2, f2_2, f3 variable values.
+    """
+    thr = defaultdict(float)
+    for v in model.getVars():
+        n = v.VarName
+
+        if n.startswith("f1[") or n.startswith("f2[") or n.startswith("f2_2[") or n.startswith("f3["):
+            parts = _parse_inside_brackets(n)
+            if not parts or len(parts) < 2:
+                continue
+
+            o, d = parts[0], parts[1]
+            try:
+                x = float(v.X)
+            except Exception:
+                x = 0.0
+
+            if x > EPS:
+                thr[o] += x
+                thr[d] += x
+
+    return thr
+
+def city_is_active(city: str, key_thr: dict) -> bool:
+    keys = CITY_TO_KEYS.get(city, [])
+    return sum(key_thr.get(k, 0.0) for k in keys) > EPS
+
 
 # ------------------------------------------------------------
 # Mode selection (Normal vs Session)
@@ -194,7 +269,7 @@ if mode == "Session Mode":
     tariff_rate_used = st.session_state.get("tariff_rate_random", 1.0)
 
 # ------------------------------------------------------------
-# GAMIFICATION MODE LOGIC (NEW)
+# GAMIFICATION MODE LOGIC 
 # ------------------------------------------------------------
 elif mode == "Gamification Mode":
     st.subheader("🧩 Gamification Mode: Design Your Network")
@@ -484,32 +559,27 @@ if st.button("Run Optimization"):
             color_map = {
                 "Plant": "purple",
                 "Cross-dock": "dodgerblue",
-                "Distribution Centre": "black",
-                "Retailer Hub": "red",
+                "DC": "black",
+                "Retail": "red",
                 "New Production Facility": "deepskyblue",
-            }
-            
-            color_map.update({
                 "Event: Suez Canal Blockade": "gold",
                 "Event: Volcano Eruption": "orange",
                 "Event: Oil Crisis": "brown",
                 "Event: Trade War": "green",
-            })
+            }
             
             size_map = {
                 "Plant": 15,
                 "Cross-dock": 14,
-                "Distribution Centre": 16,
-                "Retailer Hub": 20,
+                "DC": 16,
+                "Retail": 20,
                 "New Production Facility": 14,
-            }
-            
-            size_map.update({
                 "Event: Suez Canal Blockade": 18,
                 "Event: Volcano Eruption": 18,
                 "Event: Oil Crisis": 18,
                 "Event: Trade War": 18,
-            })
+            }
+
             
             # ================================================================
             # Build MAP
@@ -527,13 +597,45 @@ if st.button("Run Optimization"):
                 title="Global Supply Chain Structure",
             )
             
-            # marker styling
+            # compute activity once
+            key_thr = compute_key_throughput(model)
+            
             for trace in fig_map.data:
                 trace.marker.update(
                     size=size_map.get(trace.name, 12),
-                    opacity=0.9,
                     line=dict(width=0.5, color="white"),
                 )
+            
+                if trace.name.startswith("Event:") or trace.name == "New Production Facility":
+                    trace.marker.update(opacity=0.9)
+                    continue
+            
+                if hasattr(trace, "text") and trace.text is not None:
+                    per_point_opacity = [
+                        0.9 if city_is_active(city, key_thr) else 0.25
+                        for city in trace.text
+                    ]
+                    trace.marker.update(opacity=per_point_opacity)
+                else:
+                    trace.marker.update(opacity=0.9)
+
+            
+                # Events and New Production Facility -> always bright (unchanged behaviour)
+                if trace.name.startswith("Event:") or trace.name == "New Production Facility":
+                    trace.marker.update(opacity=0.9)
+                    continue
+            
+                # For other facility types: per-point opacity based on City activity
+                # px.scatter_geo puts city labels into trace.text
+                if hasattr(trace, "text") and trace.text is not None:
+                    per_point_opacity = [
+                        0.9 if city_is_active(city, key_thr) else 0.25
+                        for city in trace.text
+                    ]
+                    trace.marker.update(opacity=per_point_opacity)
+                else:
+                    trace.marker.update(opacity=0.9)
+
             
             fig_map.update_geos(
                 showcountries=True,
