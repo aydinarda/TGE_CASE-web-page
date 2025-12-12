@@ -21,6 +21,40 @@ import numpy as np
 from scipy.stats import norm
 
 
+
+
+def print_flows(flow_vars, O, D, M, title="flow"):
+    """
+    flow_vars: gurobi var dict like f1[p,c,mo]
+    O: origins list
+    D: destinations list
+    M: modes list (ModesL1 / ModesL2 / ModesL3)
+    Returns a pandas DataFrame with sums over modes.
+    """
+    if not flow_vars:
+        return pd.DataFrame(index=O, columns=D).fillna(0.0)
+
+    data = []
+    for o in O:
+        row = []
+        for d in D:
+            s = 0.0
+            for mo in M:
+                v = flow_vars.get((o, d, mo), None)
+                if v is not None:
+                    try:
+                        s += float(v.X)
+                    except Exception:
+                        pass
+            row.append(s)
+        data.append(row)
+
+    df = pd.DataFrame(data, index=O, columns=D)
+    df.index.name = title
+    return df
+
+
+
 def run_scenario_master(
     # --- Location selection (None => use full default set) ---
     active_plants=None,
@@ -703,7 +737,7 @@ def run_scenario_master(
     # ------------------------------
     f1_matrix   = print_flows(f1, Plants, Crossdocks, ModesL1, "f1 (Plant → Crossdock)")
     f2_matrix   = print_flows(f2, Crossdocks, Dcs, ModesL2, "f2 (Crossdock → DC)")
-    f2_2matrix  = print_flows(f2_2, New_Locs, Dcs, ModesL2, "f2 new (New Locs → DC)")
+    f2_2matrix  = print_flows(f2_new, New_Locs, Dcs, ModesL2, "f2 new (New Locs → DC)")
     f3_matrix   = print_flows(f3, Dcs, Retailers, ModesL3, "f3 (DC → Retailer)")
 
     # ------------------------------
