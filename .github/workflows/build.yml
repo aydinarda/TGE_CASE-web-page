@@ -79,12 +79,26 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Sanity check runner and Python architecture
+        shell: bash
+        run: |
+          uname -m
+          sw_vers
+          python -c "import sys, platform; print(sys.executable, platform.machine())"
+          file "$(python -c 'import sys; print(sys.executable)')"
+
       - name: Install dependencies
         shell: bash
         run: |
-          python -m pip install --upgrade pip
-          if [ -f optimize/requirements.txt ]; then pip install -r optimize/requirements.txt; else pip install -r requirements.txt; fi
-          pip install pyinstaller
+          arch -x86_64 python -m pip install --upgrade pip
+          if [ -f optimize/requirements.txt ]; then arch -x86_64 python -m pip install -r optimize/requirements.txt; else arch -x86_64 python -m pip install -r requirements.txt; fi
+          arch -x86_64 python -m pip install pyinstaller
+
+      - name: Verify numpy imports as x86_64
+        shell: bash
+        run: |
+          arch -x86_64 python -c "import numpy; print('numpy OK:', numpy.__version__, numpy.__file__)"
+          file "$(arch -x86_64 python -c 'import numpy._core._multiarray_umath as m; print(m.__file__)')"
 
       - name: Prune obvious build junk from payload
         shell: bash
@@ -97,7 +111,7 @@ jobs:
         shell: bash
         run: |
           rm -rf build dist
-          python -m PyInstaller \
+          arch -x86_64 python -m PyInstaller \
             --noconfirm --clean --onedir --windowed \
             --name "TNECase" \
             --target-arch x86_64 \
